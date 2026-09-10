@@ -119,84 +119,161 @@ class AIService:
         resume_text: str,
         target_role: str = "Full Stack Software Engineer"
     ) -> Dict[str, Any]:
-        """Performs deep ATS resume analysis, skill extraction, keyword matching, and gap diagnosis."""
+        """Performs deep deterministic ATS resume analysis, skill extraction, keyword matching, and gap diagnosis."""
         if not resume_text or len(resume_text.strip()) < 30:
             return {
-                "resume_score": 40,
-                "extracted_skills": ["General Basics"],
-                "missing_skills": ["Data Structures", "System Design", "Databases", "APIs", "Git"],
-                "strengths": ["Basic format provided"],
-                "improvements": ["Add detailed technical projects", "Quantify achievements with numbers", "Specify technology stack used"],
-                "formatting_score": 50,
-                "role_relevance": 45
+                "resume_score": None,
+                "ats_score": None,
+                "status": "Analysis unavailable",
+                "extracted_skills": [],
+                "missing_skills": [],
+                "strengths": [],
+                "weaknesses": ["Resume text is empty or too brief (minimum 30 characters required)."],
+                "improvements": ["Upload or paste full resume content including education, technical skills, and projects."],
+                "formatting_score": 0,
+                "role_relevance": 0,
+                "recommended_skills": [],
+                "breakdown": {}
             }
 
-        # Check for technical keywords
+        text = resume_text.strip()
+        lower_resume = text.lower()
+        words = text.split()
+        word_count = len(words)
+
+        # 1. Contact Information Extraction
+        has_email = bool(re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b', text))
+        has_phone = bool(re.search(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{3,9}', text))
+        has_links = bool(re.search(r'linkedin\.com|github\.com', lower_resume))
+        
+        contact_score = 0
+        if has_email: contact_score += 4
+        if has_phone: contact_score += 3
+        if has_links: contact_score += 3
+        contact_score = min(10, contact_score)
+
+        # 2. Section Presence & Structure
+        has_education = any(w in lower_resume for w in ["education", "academics", "b.tech", "degree", "university", "college"])
+        has_projects = any(w in lower_resume for w in ["project", "academic projects", "key projects"])
+        has_experience = any(w in lower_resume for w in ["experience", "employment", "internship", "work history"])
+        is_fresher = not has_experience
+
+        sections_count = sum([1 for x in [has_education, has_projects, has_experience or is_fresher] if x])
+        sections_score = int((sections_count / 3) * 10)
+
+        # Formatting & Length
+        bullet_count = len(re.findall(r'^[•\-\*]\s+', text, re.MULTILINE)) + len(re.findall(r'^\d+\.\s+', text, re.MULTILINE))
+        structure_score = 0
+        if sections_count >= 2: structure_score += 8
+        if bullet_count >= 3: structure_score += 6
+        if 250 <= word_count <= 1000: structure_score += 6
+        elif 150 <= word_count <= 1400: structure_score += 4
+        else: structure_score += 2
+        structure_score = min(20, structure_score)
+
+        # 3. Technical Keywords & Skill Extraction
         tech_dictionary = [
-            "Python", "JavaScript", "TypeScript", "Java", "C++", "C", "HTML", "CSS", "React",
+            "Python", "JavaScript", "TypeScript", "Java", "C++", "C#", "C", "HTML", "CSS", "React",
             "Node.js", "Express", "FastAPI", "Django", "SQL", "PostgreSQL", "MySQL", "MongoDB",
             "Git", "GitHub", "Docker", "AWS", "Linux", "REST", "API", "DSA", "Data Structures",
-            "Algorithms", "OOP", "Unit Testing", "CI/CD", "Tailwind", "Next.js"
+            "Algorithms", "OOP", "Unit Testing", "CI/CD", "Tailwind CSS", "Next.js", "Redis",
+            "Kubernetes", "GraphQL", "Spring Boot", "Machine Learning", "Pandas", "NumPy"
         ]
         
         extracted = []
-        lower_resume = resume_text.lower()
         for tech in tech_dictionary:
-            if re.search(r'\b' + re.escape(tech.lower()) + r'\b', lower_resume):
+            if re.search(r'(^|[^a-zA-Z0-9_+#])' + re.escape(tech.lower()) + r'(?=[^a-zA-Z0-9_+#]|$)', lower_resume):
                 extracted.append(tech)
 
+        tech_skills_score = min(20, (len(extracted) // 2) * 5)
+
+        # 4. Role Matching & Relevance
         role_requirements = {
             "Full Stack Software Engineer": ["React", "JavaScript", "Python", "SQL", "Git", "REST", "Data Structures"],
-            "Frontend Developer": ["HTML", "CSS", "JavaScript", "React", "TypeScript", "Tailwind", "Git"],
+            "Frontend Developer": ["HTML", "CSS", "JavaScript", "React", "TypeScript", "Git"],
             "Backend Developer": ["Python", "Java", "SQL", "PostgreSQL", "Docker", "REST", "Data Structures", "Git"],
-            "Data Engineer": ["Python", "SQL", "PostgreSQL", "MongoDB", "Linux", "Git", "Algorithms"]
+            "Data Engineer": ["Python", "SQL", "PostgreSQL", "MongoDB", "Linux", "Git", "Algorithms"],
+            "DevOps / Cloud Engineer": ["Linux", "Git", "Docker", "AWS", "CI/CD", "Python"],
+            "AI / ML Engineer": ["Python", "Machine Learning", "NumPy", "Pandas", "SQL", "Git"]
         }
 
         required_skills = role_requirements.get(target_role, role_requirements["Full Stack Software Engineer"])
-        missing = [skill for skill in required_skills if skill not in extracted]
-        match_count = len(required_skills) - len(missing)
-        role_relevance = int((match_count / max(1, len(required_skills))) * 100)
+        matched = [s for s in required_skills if any(s.lower() == e.lower() for e in extracted)]
+        missing = [s for s in required_skills if not any(s.lower() == e.lower() for e in extracted)]
+        
+        role_relevance = int((len(matched) / max(1, len(required_skills))) * 100)
+        keyword_relevance_score = min(20, int((role_relevance / 100) * 20))
 
-        # Check sections presence
-        has_education = any(w in lower_resume for w in ["education", "b.tech", "degree", "university", "college"])
-        has_projects = any(w in lower_resume for w in ["project", "developed", "built", "implemented"])
-        has_metrics = bool(re.search(r'\b\d+%\b|\b\d+x\b|\b\$\d+\b|\bincreased\b|\breduced\b', lower_resume))
+        # 5. Action Verbs & Metrics
+        action_verbs = ["developed", "engineered", "architected", "implemented", "designed", "built", "optimized", "automated", "scaled"]
+        verbs_found = [v for v in action_verbs if re.search(r'\b' + v + r'\b', lower_resume)]
+        has_metrics = bool(re.search(r'\b\d+%\b|\b\d+x\b|\b\$\d+\b|\bincreased\b|\breduced\b|\b\d+\s*(?:ms|users|requests)\b', lower_resume))
+        
+        action_score = 0
+        if len(verbs_found) >= 3: action_score += 5
+        elif len(verbs_found) >= 1: action_score += 3
+        if has_metrics: action_score += 5
+        action_score = min(10, action_score)
 
-        formatting_score = 70
-        if has_education: formatting_score += 10
-        if has_projects: formatting_score += 10
-        if has_metrics: formatting_score += 10
-        formatting_score = min(100, formatting_score)
+        # 6. Education
+        education_score = 0
+        if has_education: education_score += 5
+        if re.search(r'\b(b\.tech|b\.e\.|m\.tech|bca|mca|b\.sc|bachelor|master)\b', lower_resume): education_score += 3
+        if re.search(r'\b(cgpa|gpa|\d(?:\.\d+)?\s*/\s*10)\b', lower_resume): education_score += 2
+        education_score = min(10, education_score)
 
-        # Calculate final ATS Score
-        resume_score = int((role_relevance * 0.5) + (formatting_score * 0.3) + (min(len(extracted) * 5, 20)))
-        resume_score = min(95, max(45, resume_score))
+        # Deterministic Total (0-100)
+        total_ats_score = min(100, max(0,
+            contact_score +
+            structure_score +
+            sections_score +
+            tech_skills_score +
+            keyword_relevance_score +
+            action_score +
+            education_score
+        ))
 
         strengths = []
+        if contact_score >= 8:
+            strengths.append("Complete contact details including online professional profiles.")
+        if len(extracted) >= 5:
+            strengths.append(f"Strong technical footprint: {', '.join(extracted[:4])}.")
+        if has_metrics:
+            strengths.append("Project descriptions incorporate quantifiable engineering outcomes.")
+        if not strengths:
+            strengths.append("Clear educational background and foundational computing keywords.")
+
         improvements = []
-
-        if len(extracted) >= 4:
-            strengths.append(f"Identified strong foundational skills: {', '.join(extracted[:4])}.")
-        if has_projects:
-            strengths.append("Contains project portfolio sections that demonstrate applied problem solving.")
-        if has_education:
-            strengths.append("Clear educational credentials visible.")
-
         if missing:
-            improvements.append(f"Missing essential keywords for {target_role}: {', '.join(missing[:3])}.")
+            improvements.append(f"Incorporate missing {target_role} keywords: {', '.join(missing[:3])}.")
         if not has_metrics:
             improvements.append("Use the Google X-Y-Z formula: 'Accomplished [X] as measured by [Y], by doing [Z]'.")
-        improvements.append("Ensure your GitHub and LinkedIn profile links are clickable and active.")
+        if not has_links:
+            improvements.append("Ensure your GitHub and LinkedIn profile links are clearly visible.")
+        if is_fresher:
+            improvements.append("Highlight capstone engineering projects and live demo links to demonstrate applied skills.")
 
         return {
-            "resume_score": resume_score,
-            "extracted_skills": extracted if extracted else ["Foundational Computing"],
-            "missing_skills": missing if missing else ["Cloud Deployment (Docker/AWS)", "CI/CD Pipelines"],
-            "strengths": strengths if strengths else ["Good baseline resume structure"],
-            "improvements": improvements,
-            "formatting_score": formatting_score,
+            "resume_score": total_ats_score,
+            "ats_score": total_ats_score,
             "role_relevance": role_relevance,
-            "recommended_skills": missing[:4]
+            "formatting_score": int((structure_score / 20) * 100),
+            "extracted_skills": extracted,
+            "missing_skills": missing,
+            "strengths": strengths,
+            "weaknesses": improvements,
+            "improvements": improvements,
+            "recommendations": improvements,
+            "is_fresher": is_fresher,
+            "breakdown": {
+                "contact": {"score": contact_score, "max": 10},
+                "structure": {"score": structure_score, "max": 20},
+                "sections": {"score": sections_score, "max": 10},
+                "technical_skills": {"score": tech_skills_score, "max": 20},
+                "keyword_relevance": {"score": keyword_relevance_score, "max": 20},
+                "action_and_metrics": {"score": action_score, "max": 10},
+                "education": {"score": education_score, "max": 10}
+            }
         }
 
     def analyze_assessment_gaps(self, category_scores: Dict[str, float]) -> Dict[str, Any]:

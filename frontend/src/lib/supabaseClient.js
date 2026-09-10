@@ -117,22 +117,8 @@ function initDefaultStore() {
     ],
     // 7. user_skills (starts empty; verified dynamically from real candidate assessment submissions)
     user_skills: [],
-    // 8. resumes
-    resumes: [
-      {
-        id: 'res-1',
-        user_id: demoUserId,
-        file_name: 'prasanth_sde_resume.pdf',
-        ats_score: 92,
-        relevance_score: 94,
-        formatting_score: 90,
-        strengths: ['Clean single-column standard template', 'High keyword density for Full Stack', 'Quantified metrics using Google X-Y-Z formula'],
-        weaknesses: ['Add more system performance benchmarks', 'Mention cloud deployment pipelines'],
-        extracted_keywords: ['Python', 'React', 'FastAPI', 'PostgreSQL', 'DSA', 'Docker', 'Git'],
-        missing_keywords: ['Kubernetes', 'Redis Caching', 'CI/CD Pipelines'],
-        created_at: new Date(Date.now() - 2 * 86400000).toISOString()
-      }
-    ],
+    // 8. resumes (starts empty; populated when candidate uploads and scans real resume)
+    resumes: [],
     // 9. mock_interviews (8 completed sessions)
     mock_interviews: [
       {
@@ -689,39 +675,86 @@ export const dal = {
   resumes: {
     async getLatest(userId) {
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('resumes').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-        if (!error && data) return data;
+        try {
+          const { data, error } = await supabase
+            .from('resumes')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!error && data) return data;
+        } catch (e) {
+          console.warn('Supabase resumes fetch failed:', e.message);
+        }
       }
       const store = getLocalStore();
-      const userResumes = store.resumes.filter(r => r.user_id === userId);
-      return userResumes[0] || store.resumes[0];
+      const userResumes = (store.resumes || []).filter(r => r.user_id === userId);
+      return userResumes[0] || null;
     },
 
     async save(userId, resumeData) {
       const record = {
         id: 'res-' + Date.now(),
         user_id: userId,
-        file_name: resumeData.file_name || 'prasanth_resume.pdf',
-        ats_score: resumeData.ats_score || 92,
-        relevance_score: resumeData.relevance_score || 90,
-        formatting_score: resumeData.formatting_score || 92,
-        strengths: resumeData.strengths || [],
-        weaknesses: resumeData.weaknesses || [],
-        extracted_keywords: resumeData.extracted_keywords || [],
-        missing_keywords: resumeData.missing_keywords || [],
-        recommendations: resumeData.recommendations || [],
+        file_name: resumeData.file_name || 'resume.pdf',
+        ats_score: typeof resumeData.ats_score === 'number' ? Math.max(0, Math.min(100, Math.round(resumeData.ats_score))) : 0,
+        relevance_score: typeof resumeData.relevance_score === 'number' ? Math.max(0, Math.min(100, Math.round(resumeData.relevance_score))) : 0,
+        formatting_score: typeof resumeData.formatting_score === 'number' ? Math.max(0, Math.min(100, Math.round(resumeData.formatting_score))) : 0,
+        strengths: Array.isArray(resumeData.strengths) ? resumeData.strengths : [],
+        weaknesses: Array.isArray(resumeData.weaknesses) ? resumeData.weaknesses : [],
+        extracted_keywords: Array.isArray(resumeData.extracted_keywords) ? resumeData.extracted_keywords : [],
+        missing_keywords: Array.isArray(resumeData.missing_keywords) ? resumeData.missing_keywords : [],
+        recommendations: Array.isArray(resumeData.recommendations) ? resumeData.recommendations : [],
         created_at: new Date().toISOString()
       };
 
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('resumes').insert(record).select().single();
-        if (!error && data) return data;
+        try {
+          const { data, error } = await supabase.from('resumes').insert(record).select().single();
+          if (!error && data) {
+            // Also mirror to local store for offline continuity
+            const store = getLocalStore();
+            if (!store.resumes) store.resumes = [];
+            store.resumes = [data, ...store.resumes.filter(r => r.id !== data.id)];
+            saveLocalStore(store);
+            return data;
+          }
+        } catch (e) {
+          console.warn('Supabase resume insert failed:', e.message);
+        }
       }
 
       const store = getLocalStore();
-      store.resumes.unshift(record);
+      if (!store.resumes) store.resumes = [];
+      store.resumes = [record, ...store.resumes];
       saveLocalStore(store);
       return record;
+    },
+
+    async uploadFile(userId, file) {
+      if (!file) return { success: false, error: 'No file provided' };
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const cleanName = (file.name || 'resume.txt').replace(/[^a-zA-Z0-9._-]/g, '_');
+          const filePath = `${userId}/${Date.now()}_${cleanName}`;
+          const { data, error } = await supabase.storage.from('resumes').upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true
+          });
+          if (!error && data) {
+            return { success: true, path: data.path, fileName: cleanName };
+          }
+        } catch (e) {
+          console.warn('Supabase storage upload error:', e.message);
+        }
+      }
+      return { 
+        success: true, 
+        path: `local/${userId}/${file.name}`, 
+        fileName: file.name,
+        localOnly: true 
+      };
     }
   },
 
@@ -997,7 +1030,7 @@ export const dal = {
       },
       subMetrics: {
         skillsMastered: `${masteredSkills.length} / ${totalSkillsTracked}`,
-        resumeAtsScore: resumeAtsScore ? resumeAtsScore.toString() : '—',
+        resumeAtsScore: (resumeAtsScore !== null && resumeAtsScore !== undefined) ? resumeAtsScore.toString() : '—',
         interviewsCompleted: interviewCount.toString()
       },
       learningProgress: {

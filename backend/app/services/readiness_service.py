@@ -39,7 +39,7 @@ class PlacementReadinessService:
             progress_percentage = existing.get("learning_progress", 35)
 
         # Use existing resume score if cached
-        if existing and "resume_score" in existing:
+        if existing and existing.get("resume_score") is not None:
             resume_score = existing["resume_score"]
 
         # Multi-factor weighted score calculation:

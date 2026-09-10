@@ -214,14 +214,13 @@ export default function App() {
     refreshDashboard(user.id);
   };
 
-  const handleResumeAnalyzed = async (updatedReadiness) => {
-    await dal.resumes.save(user.id, {
-      ats_score: updatedReadiness.ats_score || 92,
-      relevance_score: updatedReadiness.relevance_score || 90,
-      strengths: updatedReadiness.strengths || [],
-      weaknesses: updatedReadiness.weaknesses || []
-    });
-    showNotification(`Resume ATS score (92/100) saved to database.`);
+  const handleResumeAnalyzed = async (resumeData) => {
+    const score = resumeData?.atsScore ?? resumeData?.ats_score ?? null;
+    if (score !== null && score !== undefined) {
+      showNotification(`Resume ATS analyzed: ${score}/100. Placement Readiness updated.`);
+    } else {
+      showNotification('Resume analysis updated.');
+    }
     refreshDashboard(user.id);
   };
 
@@ -335,6 +334,7 @@ export default function App() {
         <ResumeAnalysisView
           user={user}
           onResumeAnalyzed={handleResumeAnalyzed}
+          onNavigate={handleNavigate}
         />
       )}
 
