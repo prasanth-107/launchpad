@@ -36,6 +36,7 @@ import {
 } from './jobMatchingEngine.js';
 import { classifyOpportunityDeadline, computeOpportunityPriority } from './opportunityIntelligenceEngine.js';
 import { calculateApplicationStatistics, getUpcomingApplicationEvent } from './applicationPipelineEngine.js';
+import { buildFullInterviewIntelligence } from './interviewIntelligenceEngine.js';
 
 // Canonical Quick Prompts
 export const QUICK_PROMPTS = [
@@ -123,10 +124,14 @@ export function buildCareerCoachContext(candidateData = {}) {
     }
   }
 
-  // 5. Mock Interview Engine (Phase 8)
+  // 5. Mock Interview Engine (Phase 8 & 15)
   const latestInterview = interviews && interviews.length > 0
     ? [...interviews].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0]
     : null;
+  const interviewIntelligence = buildFullInterviewIntelligence(interviews, {
+    profile,
+    targetOpportunity: opportunities?.[0]
+  });
 
   // 6. Job Matching Engine (Phase 9)
   const candidateSkillsMap = {
@@ -230,11 +235,53 @@ export function buildCareerCoachContext(candidateData = {}) {
       technicalScore: latestInterview.technical_score ?? latestInterview.technicalScore ?? null,
       communicationScore: latestInterview.communication_score ?? latestInterview.communicationScore ?? null,
       confidenceScore: latestInterview.confidence_score ?? latestInterview.confidenceScore ?? null,
-      feedback: latestInterview.ai_feedback || latestInterview.feedback || null
+      feedback: latestInterview.ai_feedback || latestInterview.feedback || null,
+      sessionCount: interviews.length,
+      history: interviewIntelligence.history,
+      patterns: interviewIntelligence.patterns,
+      readinessSignal: interviewIntelligence.readinessSignal,
+      prepFocus: interviewIntelligence.prepFocus,
+      latestBreakdown: interviewIntelligence.latestBreakdown,
+      practiceActions: interviewIntelligence.practiceActions
     } : {
       hasInterview: false,
       overallScore: null,
-      feedback: null
+      feedback: null,
+      sessionCount: 0,
+      history: interviewIntelligence.history,
+      patterns: interviewIntelligence.patterns,
+      readinessSignal: interviewIntelligence.readinessSignal,
+      prepFocus: interviewIntelligence.prepFocus,
+      latestBreakdown: null,
+      practiceActions: []
+    },
+    interviews: latestInterview ? {
+      hasInterview: true,
+      role: latestInterview.target_role || latestInterview.role || preferredRole,
+      type: latestInterview.interview_type || 'Technical',
+      overallScore: latestInterview.overall_score ?? latestInterview.overallScore ?? null,
+      technicalScore: latestInterview.technical_score ?? latestInterview.technicalScore ?? null,
+      communicationScore: latestInterview.communication_score ?? latestInterview.communicationScore ?? null,
+      confidenceScore: latestInterview.confidence_score ?? latestInterview.confidenceScore ?? null,
+      feedback: latestInterview.ai_feedback || latestInterview.feedback || null,
+      sessionCount: interviews.length,
+      history: interviewIntelligence.history,
+      patterns: interviewIntelligence.patterns,
+      readinessSignal: interviewIntelligence.readinessSignal,
+      prepFocus: interviewIntelligence.prepFocus,
+      latestBreakdown: interviewIntelligence.latestBreakdown,
+      practiceActions: interviewIntelligence.practiceActions
+    } : {
+      hasInterview: false,
+      overallScore: null,
+      feedback: null,
+      sessionCount: 0,
+      history: interviewIntelligence.history,
+      patterns: interviewIntelligence.patterns,
+      readinessSignal: interviewIntelligence.readinessSignal,
+      prepFocus: interviewIntelligence.prepFocus,
+      latestBreakdown: null,
+      practiceActions: []
     },
     jobMatches: {
       topMatches: evaluatedJobMatches.slice(0, 3).map(m => ({
@@ -284,7 +331,7 @@ export function detectUserIntent(message = '') {
   if (m.includes('resume') || m.includes('ats') || m.includes('cv')) {
     return 'resume_improvement';
   }
-  if (m.includes('interview') || m.includes('mock') || m.includes('star')) {
+  if (m.includes('interview') || m.includes('mock') || m.includes('star') || m.includes('behavioral') || m.includes('communication') || m.includes('weak at') || m.includes('improve in interview')) {
     return 'interview_preparation';
   }
   if (m.includes('job') || m.includes('opportunity') || m.includes('drive') || m.includes('fit') || m.includes('ready for') || m.includes('apply') || m.includes('eligible') || m.includes('prioritize')) {
@@ -335,6 +382,7 @@ export function validateCoachResponse(rawResponse, fallbackContext = null) {
   return {
     summary,
     facts,
+    groundedFacts: facts,
     recommendations,
     next_action: nextAction,
     sources,
@@ -581,7 +629,7 @@ export function generateDeterministicCoachResponse(intent, context, originalMess
     };
   }
 
-  // 6. MOCK INTERVIEW PREPARATION
+  // 6. MOCK INTERVIEW PREPARATION & INTELLIGENCE
   if (intent === 'interview_preparation') {
     const upcomingInterviewApp = applications.upcomingEvent?.event_type === 'interview'
       ? applications.upcomingEvent
@@ -596,11 +644,13 @@ export function generateDeterministicCoachResponse(intent, context, originalMess
           upcomingInterviewApp
             ? `Scheduled Drive Round: ${upcomingInterviewApp.company_name} (${upcomingInterviewApp.days_left === 0 ? 'Today' : `In ${upcomingInterviewApp.days_left} days`})`
             : 'Mock Interview History: 0 completed sessions',
-          'Verbal Technical Depth & Communication: Unassessed'
+          'Verbal Technical Depth & Communication: Unassessed',
+          'Interview Readiness Signal: Not Evaluated'
         ],
         recommendations: [
           'Practice a 15-minute simulated Technical Interview to get rubric feedback on Technical Depth, STAR Communication, and Delivery.',
-          'Review system architecture, database indexing, and your key resume projects before speaking.'
+          'Review system architecture, database indexing, and your key resume projects before speaking.',
+          'Audio waveform sensors are not used; delivery is evaluated from structured phrasing and conciseness.'
         ],
         next_action: {
           label: 'Launch AI Mock Interview',
@@ -611,20 +661,126 @@ export function generateDeterministicCoachResponse(intent, context, originalMess
       };
     }
 
+    const lowerQuery = (originalMessage || '').toLowerCase();
+    const history = mockInterview.history || {};
+    const patterns = mockInterview.patterns?.patterns || [];
+    const readinessSignal = mockInterview.readinessSignal || {};
+    const latestBreakdown = mockInterview.latestBreakdown || {};
+
+    // Check if query is specifically about STAR / behavioral questions
+    if (lowerQuery.includes('star') || lowerQuery.includes('behavioral')) {
+      const starEval = latestBreakdown.questionEvaluations?.find(q => q.starAnalysis?.isApplicable) || null;
+      const starStatus = starEval?.starAnalysis?.status || 'Needs Practice';
+      const missingComp = starEval?.starAnalysis?.missingComponents || ['Result'];
+
+      return {
+        summary: `Behavioral interview answers should follow the STAR framework (Situation, Task, Action, Result). Your latest behavioral assessment status is ${starStatus}.`,
+        facts: [
+          `STAR Framework Status: ${starStatus}`,
+          starEval ? `Missing STAR Components in Latest Session: ${missingComp.join(', ') || 'None (All Present)'}` : 'Behavioral structure evaluated from past response transcripts',
+          `Communication & Structure Score: ${mockInterview.communicationScore}%`,
+          'Delivery Evaluation: Textual response completeness and phrasing pacing (audio sensors not active)'
+        ],
+        recommendations: [
+          'Situation: Set the context (project, team, tech stack, constraints) in 1-2 sentences.',
+          'Task: Clearly define your specific goal or challenge you were assigned to solve.',
+          'Action: Detail YOUR specific actions, technical choices, and problem-solving steps using "I" instead of "we".',
+          'Result: Conclude with a quantifiable outcome (e.g., "reduced latency by 30%", "delivered 2 days early") and key learnings.'
+        ],
+        next_action: {
+          label: 'Practice Behavioral Questions',
+          route: 'interview'
+        },
+        sources: [SOURCE_LABELS.MOCK_INTERVIEW],
+        disclaimer
+      };
+    }
+
+    // Check if query is about improvement or history trend
+    if (lowerQuery.includes('improving') || lowerQuery.includes('trend') || lowerQuery.includes('better') || lowerQuery.includes('progress')) {
+      const isMulti = (mockInterview.sessionCount || 0) >= 2;
+      return {
+        summary: isMulti
+          ? `Across ${mockInterview.sessionCount} completed mock interview sessions, your performance trend is ${history.trend || 'Stable'} (Score delta: ${history.scoreDelta >= 0 ? '+' : ''}${history.scoreDelta ?? 0} pts).`
+          : `You have completed 1 mock interview session with an overall score of ${mockInterview.overallScore}%. A minimum of 2 completed sessions is required to calculate a verified performance trend.`,
+        facts: [
+          `Total Completed Sessions: ${mockInterview.sessionCount}`,
+          `Latest Session Score: ${history.latestScore ?? mockInterview.overallScore}%`,
+          ...(isMulti ? [
+            `Previous Session Score: ${history.previousScore}%`,
+            `Score Delta: ${history.scoreDelta >= 0 ? '+' : ''}${history.scoreDelta} pts`,
+            `Overall Performance Trend: ${history.trend}`,
+            `Best Recorded Score: ${history.bestScore}%`,
+            `Average Score: ${history.averageScore}%`
+          ] : [
+            'Performance Trend: Insufficient Data (< 2 sessions completed)',
+            'Previous Attempt: None recorded'
+          ]),
+          `Interview Readiness: ${readinessSignal.tier || 'Needs Practice'}`
+        ],
+        recommendations: [
+          isMulti
+            ? (history.trend === 'Improving' ? 'Keep up the momentum! Focus on edge-case engineering trade-offs to reach Strong status across all pillars.' : 'Review your previous session transcripts to identify where technical depth dropped.')
+            : 'Complete a second mock interview session to establish verified trend intelligence and delta tracking.',
+          'Practice explaining your thought process out loud before finalizing your code or system design answers.'
+        ],
+        next_action: {
+          label: 'Start Next Interview Simulation',
+          route: 'interview'
+        },
+        sources: [SOURCE_LABELS.MOCK_INTERVIEW],
+        disclaimer
+      };
+    }
+
+    // Check if query is about weaknesses or what to improve
+    if (lowerQuery.includes('weak') || lowerQuery.includes('improve') || lowerQuery.includes('struggle')) {
+      const topPattern = patterns[0] || null;
+      return {
+        summary: topPattern
+          ? `Based on your interview history, your primary focus area is: ${topPattern.title} (${topPattern.type === 'initial_signal' ? 'Initial Signal' : 'Recurring Weakness'}).`
+          : `Your latest interview scored ${mockInterview.overallScore}%. Technical depth is at ${mockInterview.technicalScore}% and communication is at ${mockInterview.communicationScore}%.`,
+        facts: [
+          `Latest Score: ${mockInterview.overallScore}/100 (${mockInterview.type})`,
+          `Technical Depth: ${mockInterview.technicalScore}%`,
+          `Communication & Structure: ${mockInterview.communicationScore}%`,
+          `Delivery Confidence: ${mockInterview.confidenceScore}% (evaluated from phrasing pacing, no audio sensors)`,
+          ...(topPattern ? [`Observed Focus: ${topPattern.description}`] : ['No critical recurring deficits detected.'])
+        ],
+        recommendations: [
+          topPattern ? topPattern.recommendation : 'Deepen technical trade-off discussions with concrete production metrics.',
+          'Always state the time and space complexity (Big-O) when describing algorithmic approaches.',
+          'Use the STAR framework for all behavioral prompts to ensure complete Situation-to-Result narrative flow.'
+        ],
+        next_action: {
+          label: 'Practice Targeted Weak Area',
+          route: 'interview'
+        },
+        sources: [SOURCE_LABELS.MOCK_INTERVIEW],
+        disclaimer
+      };
+    }
+
+    // Default interview prep response
+    const defaultFacts = [
+      `Latest Mock Interview Score: ${mockInterview.overallScore}% (${mockInterview.overallScore}/100)`,
+      `Score Trajectory: ${history.trend || 'Insufficient Data'}`,
+      `Technical Depth (35%): ${mockInterview.technicalScore}%`,
+      `STAR Communication (25%): ${mockInterview.communicationScore}%`,
+      `Delivery Confidence (15%): ${mockInterview.confidenceScore}% (textual phrasing evaluated; audio waveform sensor not active)`,
+      `Interview Readiness Signal: ${readinessSignal.tier || 'Needs Practice'}`,
+      upcomingInterviewApp ? `Upcoming Interview: ${upcomingInterviewApp.company_name} in ${upcomingInterviewApp.days_left} days` : 'No upcoming external interviews scheduled'
+    ];
+
     return {
-      summary: `Your latest mock interview scored ${mockInterview.overallScore}/100 (${mockInterview.type}). Technical depth was ${mockInterview.technicalScore}% and communication scored ${mockInterview.communicationScore}%.`,
-      facts: [
-        `Latest Mock Interview Score: ${mockInterview.overallScore}/100`,
-        `Technical Depth: ${mockInterview.technicalScore}%`,
-        `STAR Communication: ${mockInterview.communicationScore}%`,
-        `Delivery Confidence: ${mockInterview.confidenceScore}%`,
-        upcomingInterviewApp ? `Upcoming Interview: ${upcomingInterviewApp.company_name} in ${upcomingInterviewApp.days_left} days` : 'No upcoming external interviews scheduled'
-      ],
+      summary: `Your latest mock interview scored ${mockInterview.overallScore}/100 (${mockInterview.type}). Technical depth was ${mockInterview.technicalScore}% and communication scored ${mockInterview.communicationScore}%. Readiness signal: ${readinessSignal.tier || 'Needs Practice'}.`,
+      facts: defaultFacts,
+      groundedFacts: defaultFacts,
       recommendations: [
         mockInterview.communicationScore < 75
           ? 'Use the STAR framework (Situation, Task, Action, Result) to avoid rambling on behavioral questions.'
-          : 'Deepen your technical trade-off explanations (e.g. SQL normalization vs denormalization).',
-        'Complete another mock interview focusing on your weaker areas.'
+          : 'Deepen your technical trade-off explanations (e.g. SQL normalization vs denormalization, async workflows).',
+        'Practice another mock interview session to continue refining structured responses.'
       ],
       next_action: {
         label: 'Practice Another Interview',

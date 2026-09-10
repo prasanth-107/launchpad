@@ -123,7 +123,8 @@ export function generateDailyPreparationPlan(candidateData = {}) {
   // RULE 0: Check if candidate is completely new (zero-data state)
   // --------------------------------------------------------------------------
   const hasAnyData = attempts.length > 0 || userSkills.length > 0 || resumes.length > 0 || 
-                     interviews.length > 0 || applications.length > 0 || courseProgress.length > 0;
+                     interviews.length > 0 || applications.length > 0 || courseProgress.length > 0 || 
+                     Boolean(candidateData.interviewIntelligence?.hasData);
 
   if (!hasAnyData) {
     return {
@@ -226,6 +227,53 @@ export function generateDailyPreparationPlan(candidateData = {}) {
       completed: completedKeys.has(`skill_critical_${skillName.toLowerCase().replace(/\s+/g, '_')}`),
       metadata: { skillName, proficiency: prof }
     });
+  }
+
+  // Phase 15: Targeted Interview Actions (STAR & Technical Depth deficits)
+  if (interviews.length > 0) {
+    const latestInt = [...interviews].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+    const commScore = Number(latestInt.communication_score ?? 0);
+    const techScore = Number(latestInt.technical_score ?? 0);
+
+    if (commScore < 65 && commScore > 0) {
+      potentialActions.push({
+        id: 'action-p1-interview-star',
+        key: 'interview_drill_star_structure',
+        title: 'Master STAR Behavioral Response Structure',
+        category: 'Mock Interview',
+        priority: ACTION_PRIORITIES.P1.code,
+        priorityLabel: ACTION_PRIORITIES.P1.label,
+        priorityVariant: ACTION_PRIORITIES.P1.variant,
+        weight: ACTION_PRIORITIES.P1.weight + (65 - commScore),
+        reason: `Your latest communication & structure score was ${commScore}%. Practice structuring answers with complete Situation, Task, Action, and Result components.`,
+        estimated_minutes: 20,
+        destination: 'interview',
+        actionLabel: 'Practice STAR Drill',
+        source: 'Mock Interview Intelligence',
+        completed: completedKeys.has('interview_drill_star_structure'),
+        metadata: { commScore, target: 75 }
+      });
+    }
+
+    if (techScore < 60 && techScore > 0) {
+      potentialActions.push({
+        id: 'action-p1-interview-tech-depth',
+        key: 'interview_drill_tech_depth',
+        title: 'Elevate Verbal Technical Depth & Architecture',
+        category: 'Mock Interview',
+        priority: ACTION_PRIORITIES.P1.code,
+        priorityLabel: ACTION_PRIORITIES.P1.label,
+        priorityVariant: ACTION_PRIORITIES.P1.variant,
+        weight: ACTION_PRIORITIES.P1.weight + (60 - techScore),
+        reason: `Your latest interview technical depth scored ${techScore}%. Practice articulating internal mechanisms, system trade-offs, and complexity metrics.`,
+        estimated_minutes: 25,
+        destination: 'interview',
+        actionLabel: 'Practice Technical Depth',
+        source: 'Mock Interview Intelligence',
+        completed: completedKeys.has('interview_drill_tech_depth'),
+        metadata: { techScore, target: 75 }
+      });
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -409,6 +457,29 @@ export function generateDailyPreparationPlan(candidateData = {}) {
     });
   }
 
+  // Phase 15 Interview Practice Actions from Intelligence
+  if (candidateData.interviewIntelligence?.practiceActions?.length > 0) {
+    candidateData.interviewIntelligence.practiceActions.forEach(pAct => {
+      potentialActions.push({
+        id: pAct.id,
+        key: pAct.action_key || pAct.id,
+        title: pAct.title,
+        category: pAct.category || 'Mock Interview',
+        priority: pAct.priority || ACTION_PRIORITIES.P1.code,
+        priorityLabel: pAct.priorityLabel || ACTION_PRIORITIES.P1.label,
+        priorityVariant: ACTION_PRIORITIES.P1.variant,
+        weight: ACTION_PRIORITIES.P1.weight + 50,
+        reason: pAct.reason,
+        estimated_minutes: pAct.estimated_minutes || 25,
+        destination: pAct.destination || 'interview',
+        actionLabel: pAct.title,
+        source: pAct.source || 'Mock Interview Intelligence',
+        completed: completedKeys.has(pAct.action_key || pAct.id),
+        metadata: { fromIntelligence: true }
+      });
+    });
+  }
+
   // Deduplicate by key
   const seenKeys = new Set();
   const uniqueActions = [];
@@ -431,6 +502,7 @@ export function generateDailyPreparationPlan(candidateData = {}) {
     mode,
     topPriority,
     plan: boundedPlan,
+    actions: boundedPlan,
     totalActions: boundedPlan.length,
     completedCount,
     readinessScore: readinessReport.score !== undefined ? readinessReport.score : null

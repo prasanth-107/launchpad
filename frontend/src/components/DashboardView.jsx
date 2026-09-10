@@ -28,6 +28,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { generateDailyPreparationPlan } from '../lib/dailyPreparationEngine';
+import { compareInterviewHistory, INTERVIEW_TRENDS } from '../lib/interviewIntelligenceEngine';
 import { StatCard } from './ui/StatCard';
 import { ProgressBar } from './ui/ProgressBar';
 import { Badge } from './ui/Badge';
@@ -77,21 +78,30 @@ export default function DashboardView({ dashboardData, onNavigate }) {
   }
 
   // Real Mock Interview Card state (never fabricated)
-  const latestInterview = dashboardData?.latestInterview || dashboardData?.mock_interviews?.[0] || dashboardData?.interviews?.[0] || null;
+  const allInterviews = dashboardData?.interviews || dashboardData?.mock_interviews || [];
+  const latestInterview = dashboardData?.latestInterview || allInterviews[0] || null;
   const hasInterview = Boolean(latestInterview && (latestInterview.overall_score !== undefined || latestInterview.overallScore !== undefined));
   const interviewScore = hasInterview ? Number(latestInterview.overall_score ?? latestInterview.overallScore) : null;
+  const interviewHistory = compareInterviewHistory(allInterviews);
 
   let interviewStatusTier = 'Needs Improvement';
-  if (interviewScore >= 75) {
+  if (interviewScore >= 80) {
     interviewStatusTier = 'Strong';
   } else if (interviewScore >= 60) {
-    interviewStatusTier = 'Good';
+    interviewStatusTier = 'Needs Improvement';
+  } else if (interviewScore !== null) {
+    interviewStatusTier = 'Critical Gap';
   }
 
   let interviewFeedback = 'Complete an AI mock interview simulation to test your technical articulation and communication.';
   if (hasInterview) {
     interviewFeedback = latestInterview.ai_feedback || latestInterview.feedback || `Last completed round: ${latestInterview.interview_type || 'Technical Interview'}`;
   }
+
+  const latestTech = latestInterview?.technical_score ?? latestInterview?.technicalScore ?? null;
+  const latestComm = latestInterview?.communication_score ?? latestInterview?.communicationScore ?? null;
+  const latestRel = latestInterview?.relevance_score ?? latestInterview?.relevanceScore ?? null;
+  const latestConf = latestInterview?.confidence_score ?? latestInterview?.confidenceScore ?? null;
 
   // Phase 10 Application Tracking & Placement Pipeline Intelligence
   const pipelineStats = dashboardData?.pipelineStats || null;
@@ -824,7 +834,7 @@ export default function DashboardView({ dashboardData, onNavigate }) {
         </div>
       </div>
 
-      {/* Dedicated AI MOCK INTERVIEW Console Card (Phase 8) */}
+      {/* Dedicated AI MOCK INTERVIEW Console Card (Phase 8 & 15) */}
       <div className="saas-card p-6 border-indigo-100/80 bg-linear-to-r from-white via-slate-50/40 to-purple-50/20 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3.5">
@@ -833,10 +843,20 @@ export default function DashboardView({ dashboardData, onNavigate }) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">MOCK INTERVIEW</h3>
-                <Badge variant={hasInterview ? (interviewScore >= 75 ? 'success' : (interviewScore >= 60 ? 'warning' : 'danger')) : 'neutral'} size="xs">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">MOCK INTERVIEW INTELLIGENCE</h3>
+                <Badge variant={hasInterview ? (interviewScore >= 80 ? 'success' : (interviewScore >= 60 ? 'warning' : 'danger')) : 'neutral'} size="xs">
                   {hasInterview ? interviewStatusTier : 'Not Evaluated'}
                 </Badge>
+                {hasInterview && interviewHistory.interviewCount >= 2 && (
+                  <Badge variant={interviewHistory.trend === 'Improving' ? 'success' : (interviewHistory.trend === 'Declining' ? 'danger' : 'neutral')} size="xs">
+                    {interviewHistory.trend} ({interviewHistory.scoreDelta >= 0 ? `+${interviewHistory.scoreDelta}` : interviewHistory.scoreDelta} pts)
+                  </Badge>
+                )}
+                {hasInterview && interviewHistory.interviewCount === 1 && (
+                  <Badge variant="neutral" size="xs">
+                    1 Session (Baseline)
+                  </Badge>
+                )}
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -856,10 +876,39 @@ export default function DashboardView({ dashboardData, onNavigate }) {
             onClick={() => onNavigate('interview')}
             className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5"
           >
-            <span>{hasInterview ? 'Retake Interview' : 'Start Mock Interview'}</span>
+            <span>{hasInterview ? 'Practice Weak Area' : 'Start Mock Interview'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {hasInterview && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 py-3 border-b border-slate-100 text-xs">
+            <div className="p-2 rounded-lg bg-slate-50/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Technical Depth</span>
+              <span className={`font-bold block mt-0.5 ${latestTech >= 80 ? 'text-emerald-600' : (latestTech >= 60 ? 'text-amber-600' : 'text-rose-600')}`}>
+                {latestTech !== null ? `${latestTech}%` : 'Not Evaluated'}
+              </span>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-50/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">STAR Structure</span>
+              <span className={`font-bold block mt-0.5 ${latestComm >= 80 ? 'text-emerald-600' : (latestComm >= 60 ? 'text-amber-600' : 'text-rose-600')}`}>
+                {latestComm !== null ? `${latestComm}%` : 'Not Evaluated'}
+              </span>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-50/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Relevance</span>
+              <span className={`font-bold block mt-0.5 ${latestRel >= 80 ? 'text-emerald-600' : (latestRel >= 60 ? 'text-amber-600' : 'text-rose-600')}`}>
+                {latestRel !== null ? `${latestRel}%` : 'Not Evaluated'}
+              </span>
+            </div>
+            <div className="p-2 rounded-lg bg-slate-50/80">
+              <span className="text-[10px] text-slate-400 uppercase font-semibold block">Delivery Confidence</span>
+              <span className={`font-bold block mt-0.5 ${latestConf >= 80 ? 'text-emerald-600' : (latestConf >= 60 ? 'text-amber-600' : 'text-rose-600')}`}>
+                {latestConf !== null ? `${latestConf}%` : 'Not Evaluated'}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-start gap-2 text-slate-600">
@@ -868,7 +917,7 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           </div>
           <span className="text-[11px] text-slate-400 shrink-0">
             {hasInterview ? (
-              <>Interview Status: <strong className={interviewScore >= 75 ? 'text-emerald-600' : (interviewScore >= 60 ? 'text-amber-600' : 'text-rose-600')}>{interviewStatusTier}</strong> ({latestInterview.target_role || latestInterview.targetRole || 'Full Stack'})</>
+              <>Interview Status: <strong className={interviewScore >= 80 ? 'text-emerald-600' : (interviewScore >= 60 ? 'text-amber-600' : 'text-rose-600')}>{interviewStatusTier}</strong> ({latestInterview.target_role || latestInterview.targetRole || 'Full Stack'})</>
             ) : (
               'No completed mock interviews yet.'
             )}

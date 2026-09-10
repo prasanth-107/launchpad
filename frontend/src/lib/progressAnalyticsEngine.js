@@ -18,6 +18,7 @@
 
 import { READINESS_PILLARS, computePlacementReadiness } from './placementReadinessEngine.js';
 import { calculateApplicationStatistics } from './applicationPipelineEngine.js';
+import { compareInterviewHistory } from './interviewIntelligenceEngine.js';
 
 // Phase 4 Skill Proficiency Thresholds
 export const SKILL_THRESHOLDS = {
@@ -100,6 +101,7 @@ export function computeProgressOverview({
   const interviewScore = latestInterview?.overall_score !== undefined && latestInterview?.overall_score !== null
     ? Number(latestInterview.overall_score)
     : (latestInterview?.overallScore !== undefined && latestInterview?.overallScore !== null ? Number(latestInterview.overallScore) : null);
+  const interviewHistory = compareInterviewHistory(interviews);
 
   // G. Application Pipeline
   const activeApps = applications.filter(a => !['rejected', 'withdrawn', 'selected'].includes(a.status?.toLowerCase())).length;
@@ -146,7 +148,13 @@ export function computeProgressOverview({
     mockInterview: {
       latestScore: interviewScore,
       completedCount: interviews.length,
-      hasData: interviewScore !== null
+      hasData: interviewScore !== null,
+      trend: interviewHistory.trend,
+      trendDescription: interviewHistory.trendDescription,
+      scoreDelta: interviewHistory.scoreDelta,
+      bestScore: interviewHistory.bestScore,
+      averageScore: interviewHistory.averageScore,
+      pillarTrends: interviewHistory.pillarTrends
     },
     applications: {
       activeCount: activeApps,
@@ -770,4 +778,13 @@ export function analyzePlacementDriveOpportunities(opportunities = []) {
     hasData: true
   };
 }
+
+/**
+ * 11. Mock Interview Intelligence Analysis (Phase 15)
+ * Analyzes interview history, session comparisons, trends, and communication patterns.
+ */
+export function analyzeInterviewProgress(interviews = []) {
+  return compareInterviewHistory(interviews);
+}
+
 

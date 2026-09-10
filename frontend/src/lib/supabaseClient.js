@@ -39,8 +39,10 @@ import {
   analyzeLearningProgress,
   analyzeAssessmentHistory,
   analyzeApplicationPipeline,
-  generateReadinessInsights
+  generateReadinessInsights,
+  analyzeInterviewProgress
 } from './progressAnalyticsEngine.js';
+import { buildFullInterviewIntelligence } from './interviewIntelligenceEngine.js';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -816,6 +818,11 @@ export const dal = {
         technical_score: Math.round(Number(interviewData.technical_score ?? interviewData.technicalScore ?? 0)),
         transcript: interviewData.transcript || interviewData.exchanges || [],
         ai_feedback: interviewData.ai_feedback || interviewData.feedback || interviewData.statusDescription || 'Interview evaluation completed.',
+        communication_analysis: interviewData.communication_analysis || interviewData.communicationAnalysis || {},
+        technical_analysis: interviewData.technical_analysis || interviewData.technicalAnalysis || {},
+        star_analysis: interviewData.star_analysis || interviewData.starAnalysis || {},
+        improvement_signals: interviewData.improvement_signals || interviewData.improvementSignals || [],
+        intelligence_summary: interviewData.intelligence_summary || interviewData.intelligenceSummary || {},
         created_at: new Date().toISOString()
       };
 
@@ -834,6 +841,22 @@ export const dal = {
       store.mock_interviews.unshift(localRecord);
       saveLocalStore(store);
       return localRecord;
+    },
+
+    async create(userId, interviewData) {
+      return await this.save(userId, interviewData);
+    },
+
+    async getIntelligence(userId) {
+      if (!userId) {
+        return buildFullInterviewIntelligence([], {});
+      }
+      const [sessions, profile, targetOpp] = await Promise.all([
+        this.list(userId),
+        dal.profiles.get(userId),
+        dal.opportunities.list().then(opps => opps[0] || null).catch(() => null)
+      ]);
+      return buildFullInterviewIntelligence(sessions, { profile, targetOpportunity: targetOpp });
     }
   },
 
@@ -1776,6 +1799,8 @@ export const dal = {
         learningProgress,
         assessmentAnalytics,
         applicationPipeline,
+        interviewAnalytics: analyzeInterviewProgress(interviews),
+        interviewIntelligence: buildFullInterviewIntelligence(interviews, { profile }),
         insights
       };
     }

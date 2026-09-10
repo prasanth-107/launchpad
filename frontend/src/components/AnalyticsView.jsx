@@ -63,6 +63,8 @@ export function AnalyticsView({ user, onNavigate }) {
   const learning = analyticsData?.learningProgress || {};
   const assessments = analyticsData?.assessmentAnalytics || {};
   const applications = analyticsData?.applicationPipeline || {};
+  const interviewAnalytics = analyticsData?.interviewAnalytics || {};
+  const interviewIntelligence = analyticsData?.interviewIntelligence || {};
   const insights = analyticsData?.insights || {};
 
   const hasReadiness = readiness?.score !== null && readiness?.score !== undefined;
@@ -504,6 +506,7 @@ export function AnalyticsView({ user, onNavigate }) {
             { id: 'assessments', label: `Assessments (${assessments?.totalAttempts || 0})` },
             { id: 'skills', label: `Skill Competencies (${skills?.totalEvaluated || 0})` },
             { id: 'learning', label: `Learning Path (${learning?.completedMilestones || 0}/${learning?.totalMilestones || 0})` },
+            { id: 'interview', label: `Mock Interview (${overview.mockInterview?.completedCount || 0})` },
             { id: 'applications', label: `Recruitment Pipeline (${applications?.total || 0})` }
           ].map(t => (
             <button
@@ -752,6 +755,289 @@ export function AnalyticsView({ user, onNavigate }) {
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Sub-tab 5: Mock Interview & Communication Intelligence (Phase 15) */}
+          {(activeTab === 'all' || activeTab === 'interview') && (
+            <div className="space-y-6 mt-8 pt-8 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Mic2 className="w-3.5 h-3.5 text-indigo-600" />
+                  Mock Interview & Communication Intelligence
+                </span>
+                <span className="text-xs text-slate-400">
+                  {interviewAnalytics.interviewCount || 0} Sessions Evaluated • Readiness: {interviewIntelligence.readinessSignal?.status || 'Not Evaluated'}
+                </span>
+              </div>
+
+              {interviewAnalytics.hasData ? (
+                <div className="space-y-5">
+                  {/* Multi-Session Performance Telemetry */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+                    <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Latest Score</span>
+                      <span className="text-xl font-bold text-slate-900 block mt-1">{interviewAnalytics.latestScore ?? '—'}%</span>
+                      <span className="text-[10px] text-slate-500">Most recent attempt</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Previous Score</span>
+                      <span className="text-xl font-bold text-slate-900 block mt-1">{interviewAnalytics.previousScore ?? '—'}%</span>
+                      <span className="text-[10px] text-slate-500">Prior session</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Score Delta</span>
+                      <span className={`text-xl font-bold block mt-1 ${
+                        interviewAnalytics.scoreDelta > 0 ? 'text-emerald-600' :
+                        interviewAnalytics.scoreDelta < 0 ? 'text-rose-600' : 'text-slate-700'
+                      }`}>
+                        {interviewAnalytics.scoreDelta !== null ? `${interviewAnalytics.scoreDelta > 0 ? '+' : ''}${interviewAnalytics.scoreDelta}%` : '—'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Latest vs prior</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Best Score</span>
+                      <span className="text-xl font-bold text-slate-900 block mt-1">{interviewAnalytics.bestScore ?? '—'}%</span>
+                      <span className="text-[10px] text-slate-500">Personal benchmark</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Trajectory Trend</span>
+                      <div className="mt-1.5">
+                        <Badge variant={
+                          interviewAnalytics.trend === 'Improving' ? 'success' :
+                          interviewAnalytics.trend === 'Declining' ? 'danger' :
+                          interviewAnalytics.trend === 'Stable' ? 'primary' : 'neutral'
+                        }>
+                          {interviewAnalytics.trend}
+                        </Badge>
+                      </div>
+                      <span className="text-[10px] text-slate-500 block mt-1">
+                        {interviewAnalytics.interviewCount >= 2 ? `${interviewAnalytics.interviewCount} sessions compared` : 'Requires 2+ sessions'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Interview Readiness Signal & 4 Pillars Breakdown */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {/* Readiness Signal Card */}
+                    <div className="p-4 rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 via-white to-slate-50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider">Interview Readiness Signal</span>
+                        <Badge variant={interviewIntelligence.readinessSignal?.variant || 'neutral'}>
+                          {interviewIntelligence.readinessSignal?.status || 'Not Evaluated'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {interviewIntelligence.readinessSignal?.description}
+                      </p>
+                      <div className="pt-2 border-t border-indigo-100/60 flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Average Performance</span>
+                        <span className="font-bold text-slate-800">{interviewAnalytics.averageScore ?? '—'}%</span>
+                      </div>
+                      {onNavigate && (
+                        <button
+                          onClick={() => onNavigate('interview')}
+                          className="w-full mt-2 py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Mic2 className="w-3.5 h-3.5" />
+                          Launch Mock Interview Simulation
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 4 Pillars Evaluation */}
+                    <div className="lg:col-span-2 p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">4 Core Interview Competencies</span>
+                        <span className="text-[10px] text-slate-400">Weighted Evaluation Framework</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        {/* Technical Depth */}
+                        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-800">Technical Depth (35%)</span>
+                            <span className="font-bold text-slate-900">{interviewAnalytics.pillarTrends?.technical?.latest ?? '—'}%</span>
+                          </div>
+                          <ProgressBar
+                            value={interviewAnalytics.pillarTrends?.technical?.latest ?? 0}
+                            max={100}
+                            variant={(interviewAnalytics.pillarTrends?.technical?.latest ?? 0) >= 80 ? 'success' : (interviewAnalytics.pillarTrends?.technical?.latest ?? 0) >= 60 ? 'primary' : 'warning'}
+                          />
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Trend: {interviewAnalytics.pillarTrends?.technical?.trend || 'Insufficient Data'}</span>
+                            {interviewAnalytics.pillarTrends?.technical?.delta !== null && (
+                              <span className={interviewAnalytics.pillarTrends?.technical?.delta >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                                {interviewAnalytics.pillarTrends?.technical?.delta >= 0 ? `+${interviewAnalytics.pillarTrends?.technical?.delta}%` : `${interviewAnalytics.pillarTrends?.technical?.delta}%`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Communication & Structure */}
+                        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-800">Communication & STAR (25%)</span>
+                            <span className="font-bold text-slate-900">{interviewAnalytics.pillarTrends?.communication?.latest ?? '—'}%</span>
+                          </div>
+                          <ProgressBar
+                            value={interviewAnalytics.pillarTrends?.communication?.latest ?? 0}
+                            max={100}
+                            variant={(interviewAnalytics.pillarTrends?.communication?.latest ?? 0) >= 80 ? 'success' : (interviewAnalytics.pillarTrends?.communication?.latest ?? 0) >= 60 ? 'primary' : 'warning'}
+                          />
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Trend: {interviewAnalytics.pillarTrends?.communication?.trend || 'Insufficient Data'}</span>
+                            {interviewAnalytics.pillarTrends?.communication?.delta !== null && (
+                              <span className={interviewAnalytics.pillarTrends?.communication?.delta >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                                {interviewAnalytics.pillarTrends?.communication?.delta >= 0 ? `+${interviewAnalytics.pillarTrends?.communication?.delta}%` : `${interviewAnalytics.pillarTrends?.communication?.delta}%`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Relevance & Responsiveness */}
+                        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-800">Prompt Relevance (25%)</span>
+                            <span className="font-bold text-slate-900">{interviewAnalytics.pillarTrends?.relevance?.latest ?? '—'}%</span>
+                          </div>
+                          <ProgressBar
+                            value={interviewAnalytics.pillarTrends?.relevance?.latest ?? 0}
+                            max={100}
+                            variant={(interviewAnalytics.pillarTrends?.relevance?.latest ?? 0) >= 80 ? 'success' : (interviewAnalytics.pillarTrends?.relevance?.latest ?? 0) >= 60 ? 'primary' : 'warning'}
+                          />
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Trend: {interviewAnalytics.pillarTrends?.relevance?.trend || 'Insufficient Data'}</span>
+                            {interviewAnalytics.pillarTrends?.relevance?.delta !== null && (
+                              <span className={interviewAnalytics.pillarTrends?.relevance?.delta >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                                {interviewAnalytics.pillarTrends?.relevance?.delta >= 0 ? `+${interviewAnalytics.pillarTrends?.relevance?.delta}%` : `${interviewAnalytics.pillarTrends?.relevance?.delta}%`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Confidence & Delivery */}
+                        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-800">Delivery & Confidence (15%)</span>
+                            <span className="font-bold text-slate-900">{interviewAnalytics.pillarTrends?.confidence?.latest ?? '—'}%</span>
+                          </div>
+                          <ProgressBar
+                            value={interviewAnalytics.pillarTrends?.confidence?.latest ?? 0}
+                            max={100}
+                            variant={(interviewAnalytics.pillarTrends?.confidence?.latest ?? 0) >= 80 ? 'success' : (interviewAnalytics.pillarTrends?.confidence?.latest ?? 0) >= 60 ? 'primary' : 'warning'}
+                          />
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Trend: {interviewAnalytics.pillarTrends?.confidence?.trend || 'Insufficient Data'}</span>
+                            {interviewAnalytics.pillarTrends?.confidence?.delta !== null && (
+                              <span className={interviewAnalytics.pillarTrends?.confidence?.delta >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
+                                {interviewAnalytics.pillarTrends?.confidence?.delta >= 0 ? `+${interviewAnalytics.pillarTrends?.confidence?.delta}%` : `${interviewAnalytics.pillarTrends?.confidence?.delta}%`}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Zero fabrication honest delivery note */}
+                      <p className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-100">
+                        * Note: Delivery evaluated from textual phrasing and completeness (audio waveform analysis not available).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Communication Patterns & Weakness Diagnostics */}
+                  {interviewIntelligence.patterns?.patterns?.length > 0 && (
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                          Diagnosed Communication Patterns & Weaknesses
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {interviewIntelligence.sessionCount >= 2 ? 'Multi-Session Pattern Analysis' : 'Initial Session Signal'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {interviewIntelligence.patterns.patterns.map(pat => (
+                          <div key={pat.id} className="p-3 rounded-lg bg-white border border-slate-200 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-900">{pat.title}</span>
+                              <Badge variant={pat.type === 'recurring_weakness' ? 'danger' : 'warning'}>
+                                {pat.badge}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed">{pat.description}</p>
+                            {pat.recommendation && (
+                              <p className="text-[11px] text-indigo-700 bg-indigo-50/60 p-2 rounded border border-indigo-100 mt-1">
+                                <strong>Coaching recommendation:</strong> {pat.recommendation}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Role-Specific Preparation Focus */}
+                  {interviewIntelligence.prepFocus && (
+                    <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <Target className="w-3.5 h-3.5 text-indigo-600" />
+                          Role-Specific Interview Preparation Focus ({interviewIntelligence.prepFocus.role})
+                        </span>
+                        <Badge variant="primary">Campus Round Focus</Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                          <span className="font-semibold text-slate-800 block">Core Technical Competencies</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {interviewIntelligence.prepFocus.coreTopics?.map((topic, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 text-[11px]">
+                                {topic}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                          <span className="font-semibold text-slate-800 block">Recommended Practice Questions</span>
+                          <ul className="space-y-1 text-slate-600 text-[11px]">
+                            {interviewIntelligence.prepFocus.recommendedQuestions?.slice(0, 3).map((q, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <ChevronRight className="w-3 h-3 text-indigo-500 shrink-0 mt-0.5" />
+                                <span>{q}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-3">
+                  <Mic2 className="w-8 h-8 text-slate-300 mx-auto" />
+                  <div className="max-w-md mx-auto space-y-1">
+                    <p className="font-semibold text-slate-700">No mock interview simulations completed yet.</p>
+                    <p className="text-slate-400">Complete an AI mock interview round to evaluate communication structure, STAR delivery, and technical answer depth.</p>
+                  </div>
+                  {onNavigate && (
+                    <button
+                      onClick={() => onNavigate('interview')}
+                      className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-sm transition-all cursor-pointer"
+                    >
+                      <Mic2 className="w-3.5 h-3.5" />
+                      Start Mock Interview
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

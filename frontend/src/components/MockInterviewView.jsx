@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, 
+  Mic2,
   MicOff, 
   Send, 
   Sparkles, 
@@ -37,6 +38,13 @@ import {
   evaluateCandidateAnswer, 
   computeSessionSummary 
 } from '../lib/mockInterviewEngine';
+import {
+  compareInterviewHistory,
+  analyzeCommunicationPatterns,
+  calculateInterviewReadinessSignal,
+  INTERVIEW_TRENDS,
+  STAR_STATUS
+} from '../lib/interviewIntelligenceEngine';
 import { apiClient } from '../api/client';
 import confetti from 'canvas-confetti';
 
@@ -123,10 +131,14 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
   };
 
   useEffect(() => {
+    fetchHistory();
+  }, [user?.id]);
+
+  useEffect(() => {
     if (activeTab === 'history') {
       fetchHistory();
     }
-  }, [activeTab, user?.id]);
+  }, [activeTab]);
 
   // Setup Web Speech Recognition
   useEffect(() => {
@@ -345,8 +357,15 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
           relevance_score: summary.relevanceScore || 0,
           confidence_score: summary.confidenceScore || 0,
           transcript: summary.exchanges,
-          ai_feedback: `${summary.statusTier}: ${summary.statusDescription}`
+          ai_feedback: `${summary.statusTier}: ${summary.statusDescription}`,
+          communication_analysis: summary.communication_analysis,
+          technical_analysis: summary.technical_analysis,
+          star_analysis: summary.star_analysis,
+          improvement_signals: summary.improvement_signals,
+          intelligence_summary: summary.intelligence_summary
         });
+
+        fetchHistory();
 
         if (onInterviewCompleted) {
           onInterviewCompleted({
@@ -861,11 +880,28 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
               <div className="saas-card p-6 sm:p-8 bg-linear-to-r from-white via-slate-50/40 to-indigo-50/30 border-indigo-100 shadow-sm space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200/80">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-slate-500">MOCK INTERVIEW EVALUATION</span>
                       <Badge variant={sessionSummary.statusVariant || 'primary'} size="xs">
                         {sessionSummary.statusTier}
                       </Badge>
+                      {(() => {
+                        const historyComparison = compareInterviewHistory(interviewHistory);
+                        if (historyComparison.interviewCount >= 2) {
+                          return (
+                            <Badge variant={historyComparison.trend === 'Improving' ? 'success' : (historyComparison.trend === 'Declining' ? 'danger' : 'neutral')} size="xs">
+                              Trend: {historyComparison.trend} ({historyComparison.scoreDelta >= 0 ? `+${historyComparison.scoreDelta}` : historyComparison.scoreDelta} pts vs previous)
+                            </Badge>
+                          );
+                        } else if (historyComparison.interviewCount === 1) {
+                          return (
+                            <Badge variant="neutral" size="xs">
+                              1 Completed Session (Baseline Established)
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
                       {targetRole} — {interviewType}
@@ -910,13 +946,20 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
                   </div>
 
                   <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1.5">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Confidence</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Confidence & Delivery</span>
+                      <span className="text-[9px] text-slate-400">Textual Pacing</span>
+                    </div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-xl font-bold text-slate-900">{sessionSummary.confidenceScore}%</span>
                     </div>
                     <ProgressBar value={sessionSummary.confidenceScore} size="xs" color="emerald" showPercentage={false} />
                   </div>
                 </div>
+
+                <p className="text-[10px] text-slate-400 italic -mt-2">
+                  * Delivery confidence evaluated from textual phrasing and response completeness (audio waveform sensors not active).
+                </p>
 
                 {/* Strategic Strengths & Actionable Recommendations */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
@@ -1015,6 +1058,66 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
                                 </div>
                               </div>
 
+                              {/* Phase 15 STAR Structure Diagnostics */}
+                              {ex.evaluation?.star_analysis?.isApplicable && (
+                                <div className="p-3 rounded-lg bg-purple-50/70 border border-purple-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-purple-900 uppercase">STAR Framework Breakdown</span>
+                                    <Badge variant={ex.evaluation.star_analysis.status === 'STAR Complete' ? 'success' : (ex.evaluation.star_analysis.status === 'STAR Partial' ? 'warning' : 'danger')} size="xs">
+                                      {ex.evaluation.star_analysis.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
+                                    <div className={`p-1 text-center rounded border ${ex.evaluation.star_analysis.components?.situation ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.star_analysis.components?.situation ? '✓ Situation' : '✗ Situation'}
+                                    </div>
+                                    <div className={`p-1 text-center rounded border ${ex.evaluation.star_analysis.components?.task ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.star_analysis.components?.task ? '✓ Task' : '✗ Task'}
+                                    </div>
+                                    <div className={`p-1 text-center rounded border ${ex.evaluation.star_analysis.components?.action ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.star_analysis.components?.action ? '✓ Action' : '✗ Action'}
+                                    </div>
+                                    <div className={`p-1 text-center rounded border ${ex.evaluation.star_analysis.components?.result ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.star_analysis.components?.result ? '✓ Result' : '✗ Result'}
+                                    </div>
+                                  </div>
+                                  {ex.evaluation.star_analysis.missingComponents?.length > 0 && (
+                                    <p className="text-[10px] text-purple-700 font-medium">
+                                      Missing elements: {ex.evaluation.star_analysis.missingComponents.join(', ')}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Phase 15 Technical Depth Diagnostics */}
+                              {ex.evaluation?.technical_analysis && (
+                                <div className="p-3 rounded-lg bg-indigo-50/70 border border-indigo-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold text-indigo-900 uppercase">Technical Articulation Elements</span>
+                                    <Badge variant={ex.evaluation.technical_analysis.status === 'Strong' ? 'success' : (ex.evaluation.technical_analysis.status === 'Needs Improvement' ? 'warning' : 'danger')} size="xs">
+                                      {ex.evaluation.technical_analysis.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5 text-[10px]">
+                                    <span className={`px-2 py-0.5 rounded border ${ex.evaluation.technical_analysis.hasDefinition ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.technical_analysis.hasDefinition ? '✓ Definition' : '✗ Definition'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded border ${ex.evaluation.technical_analysis.hasExplanation ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.technical_analysis.hasExplanation ? '✓ Internal Mechanism' : '✗ Internal Mechanism'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded border ${ex.evaluation.technical_analysis.hasImplementation ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.technical_analysis.hasImplementation ? '✓ Architecture / Code' : '✗ Architecture / Code'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded border ${ex.evaluation.technical_analysis.hasTradeoffs ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.technical_analysis.hasTradeoffs ? '✓ Trade-offs' : '✗ Trade-offs'}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded border ${ex.evaluation.technical_analysis.hasComplexity ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-400 border-slate-200'}`}>
+                                      {ex.evaluation.technical_analysis.hasComplexity ? '✓ Complexity' : '✗ Complexity'}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
                               <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
                                 <span className="font-bold text-slate-800 text-[11px] block">Rubric Feedback:</span>
                                 <p className="text-slate-600 leading-relaxed text-[11px]">{ex.evaluation.feedback}</p>
@@ -1040,7 +1143,20 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
                     <span>Retake Another Interview</span>
                   </button>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setShowCompletionReport(false);
+                        setSessionActive(false);
+                        const weakComm = (sessionSummary.communicationScore || 0) < (sessionSummary.technicalScore || 0);
+                        setInterviewType(weakComm ? 'HR / Behavioral' : 'Technical Interview');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Practice Weak Area ({(sessionSummary.communicationScore || 0) < (sessionSummary.technicalScore || 0) ? 'Behavioral & STAR' : 'Technical Depth'})</span>
+                    </button>
+
                     <button
                       onClick={() => {
                         setActiveTab('history');
@@ -1098,7 +1214,93 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
               </button>
             </div>
           ) : (
-            /* Real Sessions Table */
+            <>
+            {/* Phase 15 Multi-Session Comparison Banner & Communication Patterns */}
+            {(() => {
+              const historyComparison = compareInterviewHistory(interviewHistory);
+              const patternsAnalysis = analyzeCommunicationPatterns(interviewHistory);
+              const readinessSignal = calculateInterviewReadinessSignal(historyComparison, user);
+
+              return (
+                <div className="space-y-4">
+                  {/* Multi-Session Telemetry Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                    <div className="saas-card p-4 space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Latest Score</span>
+                      <span className="text-2xl font-extrabold text-indigo-700">{historyComparison.latestScore ?? '—'}%</span>
+                      <span className="text-[10px] text-slate-400 block">Most recent round</span>
+                    </div>
+                    <div className="saas-card p-4 space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Previous Attempt</span>
+                      <span className="text-2xl font-extrabold text-slate-800">{historyComparison.previousScore !== null ? `${historyComparison.previousScore}%` : '—'}</span>
+                      <span className="text-[10px] text-slate-400 block">Prior simulation</span>
+                    </div>
+                    <div className="saas-card p-4 space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Trend & Delta</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Badge variant={historyComparison.trend === 'Improving' ? 'success' : (historyComparison.trend === 'Declining' ? 'danger' : 'neutral')} size="xs">
+                          {historyComparison.trend}
+                        </Badge>
+                        {historyComparison.interviewCount >= 2 && (
+                          <span className="text-xs font-bold text-slate-700">
+                            {historyComparison.scoreDelta >= 0 ? `+${historyComparison.scoreDelta}` : historyComparison.scoreDelta} pts
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block line-clamp-1">{historyComparison.trendDescription}</span>
+                    </div>
+                    <div className="saas-card p-4 space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Best Score</span>
+                      <span className="text-2xl font-extrabold text-emerald-600">{historyComparison.bestScore ?? '—'}%</span>
+                      <span className="text-[10px] text-slate-400 block">All-time record</span>
+                    </div>
+                    <div className="saas-card p-4 space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Readiness Signal</span>
+                      <div className="mt-1">
+                        <Badge variant={readinessSignal.variant || 'primary'} size="xs">
+                          {readinessSignal.tier}
+                        </Badge>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block line-clamp-1">{readinessSignal.recommendation}</span>
+                    </div>
+                  </div>
+
+                  {/* Communication Patterns Card */}
+                  {patternsAnalysis.patterns.length > 0 && (
+                    <div className="saas-card p-5 space-y-3 border-indigo-100 bg-linear-to-r from-white via-indigo-50/20 to-white">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-indigo-600" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            {patternsAnalysis.label}
+                          </h4>
+                        </div>
+                        <span className="text-[11px] text-slate-500">{patternsAnalysis.description}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {patternsAnalysis.patterns.map((pat) => (
+                          <div key={pat.id} className="p-3.5 rounded-xl bg-white border border-slate-200/90 shadow-2xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-slate-900">{pat.title}</span>
+                              <Badge variant={pat.type === 'initial_signal' ? 'warning' : 'danger'} size="xs">
+                                {pat.type === 'initial_signal' ? 'Initial Signal (1 Session)' : 'Recurring Weakness'}
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] text-slate-600">{pat.description}</p>
+                            <p className="text-[10px] text-indigo-700 font-medium pt-0.5 border-t border-slate-100">
+                              Action: {pat.recommendation}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Real Sessions Table */}
             <div className="saas-card overflow-hidden">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                 <div>
@@ -1171,6 +1373,7 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
                 </table>
               </div>
             </div>
+            </>
           )}
 
           {/* Selected Session Details Modal / Panel */}
@@ -1227,8 +1430,22 @@ export default function MockInterviewView({ user, initialTab = 'simulate', onInt
                   </span>
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                     {selectedHistorySession.transcript.map((item, i) => (
-                      <div key={i} className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1">
-                        <span className="font-bold text-slate-900 block">Q{i + 1}: {item.question}</span>
+                      <div key={i} className="p-3.5 rounded-xl bg-white border border-slate-200 space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <span className="font-bold text-slate-900 block">Q{i + 1}: {item.question}</span>
+                          <div className="flex items-center gap-1.5">
+                            {item.evaluation?.star_analysis?.isApplicable && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${item.evaluation.star_analysis.status === 'STAR Complete' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+                                {item.evaluation.star_analysis.status}
+                              </span>
+                            )}
+                            {item.evaluation?.technical_analysis && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${item.evaluation.technical_analysis.status === 'Strong' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                                Tech Depth: {item.evaluation.technical_analysis.status}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                         <p className="text-slate-600 italic">"{item.studentAnswer}"</p>
                         {item.evaluation?.feedback && (
                           <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-100">

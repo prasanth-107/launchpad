@@ -15,6 +15,11 @@
  * 5. Full Alignment: Syncs with public.mock_interviews schema & 15% Placement Readiness pillar.
  * -----------------------------------------------------------------------------
  */
+import {
+  analyzeStarCommunication,
+  analyzeTechnicalAnswer,
+  analyzeAnswerQuality
+} from './interviewIntelligenceEngine.js';
 
 export const INTERVIEW_ROLES = [
   'Full Stack Software Engineer',
@@ -262,7 +267,19 @@ export function generateInterviewQuestions(targetRole = 'Full Stack Software Eng
 /**
  * Evaluates a candidate's answer using deterministic rubric scoring.
  */
-export function evaluateCandidateAnswer({ question, studentAnswer, interviewType = 'Technical Interview', role = 'Full Stack Software Engineer' }) {
+export function evaluateCandidateAnswer(arg1, arg2, arg3, arg4) {
+  let question, studentAnswer, interviewType, role;
+  if (typeof arg1 === 'object' && arg1 !== null && ('studentAnswer' in arg1 || 'answer' in arg1)) {
+    question = arg1.question;
+    studentAnswer = arg1.studentAnswer || arg1.answer;
+    interviewType = arg1.interviewType || 'Technical Interview';
+    role = arg1.role || 'Full Stack Software Engineer';
+  } else {
+    question = arg1;
+    studentAnswer = arg2;
+    interviewType = typeof arg3 === 'string' ? arg3 : (typeof arg4 === 'string' ? arg4 : 'Technical Interview');
+    role = typeof arg4 === 'string' && arg4 !== interviewType ? arg4 : 'Full Stack Software Engineer';
+  }
   const trimmed = typeof studentAnswer === 'string' ? studentAnswer.trim() : '';
   const lowerTrimmed = trimmed.toLowerCase();
   const rawWords = trimmed.split(/\s+/).filter(Boolean);
@@ -271,6 +288,9 @@ export function evaluateCandidateAnswer({ question, studentAnswer, interviewType
   ].some(phrase => lowerTrimmed.includes(phrase));
 
   if (!trimmed || trimmed.length < 20 || rawWords.length < 5 || isEvasive) {
+    const starAnalysis = analyzeStarCommunication(trimmed, question);
+    const technicalAnalysis = analyzeTechnicalAnswer(trimmed, question);
+    const answerQuality = analyzeAnswerQuality(trimmed, question, interviewType);
     return {
       overall_score: 25,
       overallScore: 25,
@@ -287,7 +307,13 @@ export function evaluateCandidateAnswer({ question, studentAnswer, interviewType
       weaknesses: ['Response lacks explanatory depth; provide concrete technical arguments.'],
       follow_up: 'Could you elaborate with a specific technical example from a project you built?',
       followUpQuestion: 'Could you elaborate with a specific technical example from a project you built?',
-      detectedMetrics: { wordCount: rawWords.length, hasSTAR: false, matchedConcepts: [] }
+      detectedMetrics: { wordCount: rawWords.length, hasSTAR: false, matchedConcepts: [] },
+      star_analysis: starAnalysis,
+      starAnalysis,
+      technical_analysis: technicalAnalysis,
+      technicalAnalysis,
+      answer_quality: answerQuality,
+      answerQuality
     };
   }
 
@@ -429,6 +455,10 @@ export function evaluateCandidateAnswer({ question, studentAnswer, interviewType
     follow_up = `How would you handle ${missingConcepts[0]} in a high-traffic production scenario?`;
   }
 
+  const starAnalysis = analyzeStarCommunication(trimmed, question);
+  const technicalAnalysis = analyzeTechnicalAnswer(trimmed, question);
+  const answerQuality = analyzeAnswerQuality(trimmed, question, interviewType);
+
   return {
     overall_score: overall,
     overallScore: overall,
@@ -445,7 +475,13 @@ export function evaluateCandidateAnswer({ question, studentAnswer, interviewType
     weaknesses: weaknesses.length > 0 ? weaknesses : ['Could provide additional production metrics.'],
     follow_up,
     followUpQuestion: follow_up,
-    detectedMetrics: { wordCount, hasSTAR: hasStar, matchedConcepts, matchedReasoning }
+    detectedMetrics: { wordCount, hasSTAR: hasStar, matchedConcepts, matchedReasoning },
+    star_analysis: starAnalysis,
+    starAnalysis,
+    technical_analysis: technicalAnalysis,
+    technicalAnalysis,
+    answer_quality: answerQuality,
+    answerQuality
   };
 }
 
@@ -528,11 +564,46 @@ export function computeSessionSummary(exchanges = [], targetRole = 'Full Stack S
       description: 'Keep opening project summaries within 90 seconds and eliminate filler words like "maybe" or "I guess".'
     });
   }
-  recommendations.push({
-    priority: 'Low',
-    title: 'Incorporate Quantified Project Metrics',
-    description: 'Reference actual metrics from your projects (e.g. "Reduced API response latency by 35%") during technical discussions.'
-  });
+  // Phase 15 Intelligence Aggregation
+  const starAnalyses = validEvals.map(e => e.star_analysis || e.starAnalysis).filter(Boolean);
+  const techAnalyses = validEvals.map(e => e.technical_analysis || e.technicalAnalysis).filter(Boolean);
+
+  const starCompleteCount = starAnalyses.filter(s => s.status === 'STAR Complete').length;
+  const starMissingCount = starAnalyses.filter(s => s.status === 'STAR Missing').length;
+  const techStrongCount = techAnalyses.filter(t => t.status === 'Strong').length;
+
+  const communicationAnalysis = {
+    starCompleteCount,
+    starMissingCount,
+    totalBehavioralQuestions: starAnalyses.filter(s => s.isApplicable).length,
+    structuralSignpostingScore: commAvg
+  };
+
+  const technicalAnalysis = {
+    techStrongCount,
+    totalTechnicalQuestions: techAnalyses.length,
+    conceptualDepthScore: techAvg
+  };
+
+  const improvementSignals = [
+    ...(commAvg < 75 ? ['Structure behavioral answers with complete STAR framework (Situation, Task, Action, Result)'] : []),
+    ...(techAvg < 75 ? ['Deepen technical explanations with system architecture, trade-offs, and complexity metrics'] : []),
+    ...(confAvg < 70 ? ['Eliminate hesitation phrases and deliver concise responses within 60-120 seconds'] : [])
+  ];
+
+  const intelligenceSummary = {
+    overallTier: statusTier,
+    technicalStatus: techAvg >= 80 ? 'Strong' : (techAvg >= 60 ? 'Needs Improvement' : 'Critical Gap'),
+    communicationStatus: commAvg >= 80 ? 'Strong' : (commAvg >= 60 ? 'Needs Improvement' : 'Critical Gap'),
+    relevanceStatus: relAvg >= 80 ? 'Strong' : (relAvg >= 60 ? 'Needs Improvement' : 'Critical Gap'),
+    confidenceStatus: confAvg >= 80 ? 'Strong' : (confAvg >= 60 ? 'Needs Improvement' : 'Critical Gap'),
+    keyPillars: {
+      technical: techAvg,
+      communication: commAvg,
+      relevance: relAvg,
+      confidence: confAvg
+    }
+  };
 
   return {
     overallScore: overallAvg,
@@ -550,6 +621,14 @@ export function computeSessionSummary(exchanges = [], targetRole = 'Full Stack S
     exchanges,
     targetRole,
     interviewType,
-    questionsAnswered: count
+    questionsAnswered: count,
+    communication_analysis: communicationAnalysis,
+    communicationAnalysis,
+    technical_analysis: technicalAnalysis,
+    technicalAnalysis,
+    improvement_signals: improvementSignals,
+    improvementSignals,
+    intelligence_summary: intelligenceSummary,
+    intelligenceSummary
   };
 }
