@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { ProgressBar } from './ui/ProgressBar';
+import { EmptyState } from './ui/EmptyState';
 
 export default function DsaSheetsView() {
   const [selectedTopic, setSelectedTopic] = useState('All');
@@ -115,67 +116,77 @@ export default function DsaSheetsView() {
       </div>
 
       {/* Problems DataTable */}
-      <div className="saas-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-200">
-              <tr>
-                <th className="p-3.5 w-12 text-center">Status</th>
-                <th className="p-3.5">Problem Title</th>
-                <th className="p-3.5">Category Topic</th>
-                <th className="p-3.5">Difficulty</th>
-                <th className="p-3.5 text-right">Practice Platform</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredProblems.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="p-3.5 text-center">
-                    <button
-                      onClick={() => toggleSolved(p.id)}
-                      className="text-slate-400 hover:text-indigo-600 transition-colors"
-                      title={p.solved ? "Mark as Unsolved" : "Mark as Solved"}
-                    >
-                      {p.solved ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-600 fill-emerald-50" />
-                      ) : (
-                        <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
-                      )}
-                    </button>
-                  </td>
-                  <td className="p-3.5 font-semibold text-slate-900">
-                    <span className={p.solved ? 'line-through text-slate-400' : ''}>
-                      {p.title}
-                    </span>
-                  </td>
-                  <td className="p-3.5 text-slate-500 font-mono text-[11px]">
-                    {p.topic}
-                  </td>
-                  <td className="p-3.5">
-                    <Badge 
-                      variant={p.difficulty === 'Easy' ? 'success' : p.difficulty === 'Medium' ? 'warning' : 'danger'} 
-                      size="xs"
-                    >
-                      {p.difficulty}
-                    </Badge>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <a
-                      href={p.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold"
-                    >
-                      <span>Solve</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </td>
+      {filteredProblems.length === 0 ? (
+        <EmptyState
+          icon={Code}
+          title="No problems found"
+          description={search ? `No DSA problems matching "${search}". Try searching for another keyword.` : `No problems found under "${selectedTopic}".`}
+          actionLabel="Clear Filters"
+          onAction={() => { setSelectedTopic('All'); setSearch(''); }}
+        />
+      ) : (
+        <div className="saas-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="p-3.5 w-12 text-center">Status</th>
+                  <th className="p-3.5">Problem Title</th>
+                  <th className="p-3.5">Category Topic</th>
+                  <th className="p-3.5">Difficulty</th>
+                  <th className="p-3.5 text-right">Practice Platform</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredProblems.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="p-3.5 text-center">
+                      <button
+                        onClick={() => toggleSolved(p.id)}
+                        className="text-slate-400 hover:text-indigo-600 transition-colors"
+                        title={p.solved ? "Mark as Unsolved" : "Mark as Solved"}
+                      >
+                        {p.solved ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-600 fill-emerald-50" />
+                        ) : (
+                          <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                        )}
+                      </button>
+                    </td>
+                    <td className="p-3.5 font-semibold text-slate-900">
+                      <span className={p.solved ? 'line-through text-slate-400' : ''}>
+                        {p.title}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-slate-500 font-mono text-[11px]">
+                      {p.topic}
+                    </td>
+                    <td className="p-3.5">
+                      <Badge 
+                        variant={p.difficulty === 'Easy' ? 'success' : p.difficulty === 'Medium' ? 'warning' : 'danger'} 
+                        size="xs"
+                      >
+                        {p.difficulty}
+                      </Badge>
+                    </td>
+                    <td className="p-3.5 text-right">
+                      <a
+                        href={p.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold"
+                      >
+                        <span>Solve</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );

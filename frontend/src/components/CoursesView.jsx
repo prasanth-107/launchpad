@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ProgressBar } from './ui/ProgressBar';
 import { Badge } from './ui/Badge';
+import { EmptyState } from './ui/EmptyState';
 
 export default function CoursesView({ onNavigateToResources }) {
   const [selectedFilter, setSelectedFilter] = useState('All');
@@ -138,60 +139,70 @@ export default function CoursesView({ onNavigateToResources }) {
       </div>
 
       {/* Course Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCourses.map((course) => (
-          <div 
-            key={course.id}
-            className="saas-card p-6 flex flex-col justify-between hover:border-slate-300 transition-colors"
-          >
-            <div>
-              <div className="flex items-center justify-between text-xs mb-3">
-                <Badge variant="primary" size="xs">
-                  {course.category}
-                </Badge>
-                <span className="text-[11px] font-medium text-slate-500">{course.difficulty}</span>
-              </div>
-
-              <h3 className="text-base font-bold text-slate-900 leading-snug">{course.title}</h3>
-              <p className="text-xs text-slate-500 mt-1 font-medium">By {course.instructor}</p>
-              
-              <p className="text-xs text-slate-600 mt-3 line-clamp-2 leading-relaxed">
-                {course.description}
-              </p>
-
-              <div className="flex items-center gap-4 text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
-                <span className="flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5" />
-                  {course.modules}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" />
-                  {course.duration}
-                </span>
-              </div>
-            </div>
-
-            {/* Progress & Continue */}
-            <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Progress</span>
-                  <span className="font-bold text-slate-900">{course.progress}%</span>
+      {filteredCourses.length === 0 ? (
+        <EmptyState
+          icon={BookOpen}
+          title="No courses found"
+          description={searchQuery ? `No courses matching "${searchQuery}". Try a different keyword.` : `No courses available in "${selectedFilter}".`}
+          actionLabel="Clear Filters"
+          onAction={() => { setSelectedFilter('All'); setSearchQuery(''); }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCourses.map((course) => (
+            <div 
+              key={course.id}
+              className="saas-card p-6 flex flex-col justify-between hover:border-slate-300 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-xs mb-3">
+                  <Badge variant="primary" size="xs">
+                    {course.category}
+                  </Badge>
+                  <span className="text-[11px] font-medium text-slate-500">{course.difficulty}</span>
                 </div>
-                <ProgressBar value={course.progress} size="xs" color={course.progress === 100 ? 'emerald' : 'indigo'} showPercentage={false} />
+
+                <h3 className="text-base font-bold text-slate-900 leading-snug">{course.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 font-medium">By {course.instructor}</p>
+                
+                <p className="text-xs text-slate-600 mt-3 line-clamp-2 leading-relaxed">
+                  {course.description}
+                </p>
+
+                <div className="flex items-center gap-4 text-xs text-slate-400 mt-4 pt-3 border-t border-slate-100">
+                  <span className="flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" />
+                    {course.modules}
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    {course.duration}
+                  </span>
+                </div>
               </div>
 
-              <button
-                onClick={() => onNavigateToResources && onNavigateToResources(course.category.toLowerCase())}
-                className="w-full py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
-              >
-                <span>{course.progress === 100 ? 'Review Modules' : 'Continue Course'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              {/* Progress & Continue */}
+              <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Progress</span>
+                    <span className="font-bold text-slate-900">{course.progress}%</span>
+                  </div>
+                  <ProgressBar value={course.progress} size="xs" color={course.progress === 100 ? 'emerald' : 'indigo'} showPercentage={false} />
+                </div>
+
+                <button
+                  onClick={() => onNavigateToResources && onNavigateToResources(course.category.toLowerCase())}
+                  className="w-full py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <span>{course.progress === 100 ? 'Review Modules' : 'Continue Course'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
     </div>
   );

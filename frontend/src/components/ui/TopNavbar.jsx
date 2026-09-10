@@ -14,6 +14,8 @@ import {
 export default function TopNavbar({ 
   onToggleSidebar, 
   activeTab, 
+  setActiveTab,
+  onNavigate,
   user, 
   onLogout, 
   onOpenProfile,

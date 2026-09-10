@@ -25,6 +25,7 @@ import {
   Search
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
+import { EmptyState } from './ui/EmptyState';
 import { apiClient } from '../api/client';
 import confetti from 'canvas-confetti';
 
@@ -415,56 +416,66 @@ export default function AssessmentView({ user, onAssessmentCompleted }) {
       </div>
 
       {/* Assessment DataTable */}
-      <div className="saas-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-200">
-              <tr>
-                <th className="p-3.5">Assessment Name</th>
-                <th className="p-3.5">Category</th>
-                <th className="p-3.5">Questions</th>
-                <th className="p-3.5">Duration</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {filteredList.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="p-3.5 font-bold text-slate-900">
-                    {row.name}
-                  </td>
-                  <td className="p-3.5 text-slate-500">
-                    {row.category}
-                  </td>
-                  <td className="p-3.5 font-mono">
-                    {row.questions} Qs
-                  </td>
-                  <td className="p-3.5 font-mono">
-                    {row.duration}
-                  </td>
-                  <td className="p-3.5">
-                    <Badge 
-                      variant={row.status === 'Completed' ? 'success' : row.status === 'In Progress' ? 'warning' : 'primary'} 
-                      size="xs"
-                    >
-                      {row.status === 'Completed' ? `Completed (${row.score}%)` : row.status}
-                    </Badge>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <button
-                      onClick={() => startQuiz(row.id)}
-                      className="px-3.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-semibold transition-colors"
-                    >
-                      {row.status === 'Completed' ? 'Retake' : 'Start Test'}
-                    </button>
-                  </td>
+      {filteredList.length === 0 ? (
+        <EmptyState
+          icon={CheckCircle2}
+          title="No assessments found"
+          description={`There are currently no assessments matching the "${activeTab}" filter.`}
+          actionLabel="View All Assessments"
+          onAction={() => setActiveTab('All')}
+        />
+      ) : (
+        <div className="saas-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[10px] font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="p-3.5">Assessment Name</th>
+                  <th className="p-3.5">Category</th>
+                  <th className="p-3.5">Questions</th>
+                  <th className="p-3.5">Duration</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {filteredList.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="p-3.5 font-bold text-slate-900">
+                      {row.name}
+                    </td>
+                    <td className="p-3.5 text-slate-500">
+                      {row.category}
+                    </td>
+                    <td className="p-3.5 font-mono">
+                      {row.questions} Qs
+                    </td>
+                    <td className="p-3.5 font-mono">
+                      {row.duration}
+                    </td>
+                    <td className="p-3.5">
+                      <Badge 
+                        variant={row.status === 'Completed' ? 'success' : row.status === 'In Progress' ? 'warning' : 'primary'} 
+                        size="xs"
+                      >
+                        {row.status === 'Completed' ? `Completed (${row.score}%)` : row.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3.5 text-right">
+                      <button
+                        onClick={() => startQuiz(row.id)}
+                        className="px-3.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-semibold transition-colors"
+                      >
+                        {row.status === 'Completed' ? 'Retake' : 'Start Test'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
