@@ -8,7 +8,8 @@ export function AppShell({
   setActiveTab, 
   user, 
   onLogout,
-  readinessScore 
+  readinessScore,
+  onSwitchPersona
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -38,6 +39,7 @@ export function AppShell({
           onLogout={onLogout}
           onOpenProfile={(tab = 'profile') => setActiveTab(tab)}
           readinessScore={readinessScore}
+          onSwitchPersona={onSwitchPersona}
         />
 
         {/* Dynamic Page Content */}

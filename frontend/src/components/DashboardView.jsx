@@ -1,4 +1,5 @@
 import { generatePlacementStrategy, STUDENT_READINESS_STAGES } from '../lib/studentSuccessEngine';
+import { FIRST_TIME_ONBOARDING_STEPS } from '../lib/demoModeManager';
 import React from 'react';
 import { 
   Target, 
@@ -269,6 +270,47 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           </button>
         </div>
       </div>
+
+      {/* 20.4 First-Time Candidate Onboarding Roadmap (Zero Data Honest Flow) */}
+      {!hasReadiness && (
+        <div className="saas-card p-6 border-indigo-200/80 bg-gradient-to-r from-indigo-50/60 via-white to-purple-50/40 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="inline-block px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wider mb-1.5">
+                First-Time User Onboarding Guide
+              </span>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                10-Step Placement Preparation Roadmap
+              </h2>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Welcome to Modern Placement Launchpad! Complete these sequential milestones to build verified readiness and unlock campus drives.
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate('assessments')}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              Step 1: Take Diagnostic Assessment &rarr;
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+            {FIRST_TIME_ONBOARDING_STEPS.map((st) => (
+              <div
+                key={st.step}
+                onClick={() => onNavigate(st.target)}
+                className="p-3 rounded-xl bg-white border border-slate-200/80 hover:border-indigo-300 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between space-y-1 text-xs"
+              >
+                <div>
+                  <span className="text-[10px] font-bold text-indigo-600 block">Step {st.step}</span>
+                  <span className="font-bold text-slate-800 line-clamp-1">{st.title}</span>
+                </div>
+                <span className="text-[10px] text-slate-400 line-clamp-2">{st.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 1B. AI CAREER COACH Widget (Phase 11 Placement Copilot) */}
       <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-xl p-4 sm:p-5 text-white shadow-xs border border-indigo-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AppShell } from './components/ui/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import DashboardView from './components/DashboardView';
+import { getPersonaById } from './lib/demoModeManager';
 
 // Route-level code splitting for production performance & chunk optimization
 const PreparationWorkspaceView = lazy(() => import('./components/PreparationWorkspaceView'));
@@ -253,6 +254,34 @@ export default function App() {
     refreshDashboard(user.id);
   };
 
+  const handleSwitchPersona = (personaKey) => {
+    const persona = getPersonaById(personaKey);
+    setUser(persona);
+    localStorage.setItem('mpl_current_user', JSON.stringify(persona));
+    if (personaKey === 'admin') {
+      setActiveTab('admin');
+      showNotification('Switched to Placement Officer (Admin Command Center)');
+    } else if (personaKey === 'new_student') {
+      setDashboardData({
+        profile: persona,
+        stats: { testsCompleted: '0', questionsAttempted: '0', learningMinutes: '0 mins', currentStreak: '0 days' },
+        subMetrics: { skillsMastered: '0 / 16', resumeAtsScore: null, interviewsCompleted: '0' },
+        readinessReport: { score: null, status: 'Assessment in Progress', pillars: [] },
+        resumes: [],
+        interviews: [],
+        applications: [],
+        recentActivities: [],
+        placementReadiness: null
+      });
+      setActiveTab('dashboard');
+      showNotification('Switched to First-Time Candidate (Zero Data Experience)');
+    } else {
+      setActiveTab('dashboard');
+      refreshDashboard(persona.id);
+      showNotification(`Switched to ${persona.name}`);
+    }
+  };
+
   const readinessScore = dashboardData?.placementReadiness ?? dashboardData?.readiness?.placement_readiness ?? null;
 
   // 1. Session Verification Loading State (Prevents flash of protected content)
@@ -281,6 +310,7 @@ export default function App() {
       user={user}
       onLogout={handleLogout}
       readinessScore={readinessScore}
+      onSwitchPersona={handleSwitchPersona}
     >
       {/* Toast Notification */}
       {notification && (

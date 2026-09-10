@@ -20,7 +20,8 @@ export default function TopNavbar({
   user, 
   onLogout, 
   onOpenProfile,
-  readinessScore 
+  readinessScore,
+  onSwitchPersona
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -31,6 +32,12 @@ export default function TopNavbar({
       case 'preparation':
       case 'daily-plan':
         return 'Preparation Workspace';
+      case 'adaptive-practice':
+      case 'practice':
+        return 'Adaptive Practice';
+      case 'admin':
+      case 'command-center':
+        return 'Placement Command Center';
       case 'career-coach':
       case 'coach':
       case 'placement-copilot':
@@ -113,6 +120,23 @@ export default function TopNavbar({
             className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"
           />
         </div>
+
+        {/* Evaluator Demo Mode Selector */}
+        {onSwitchPersona && (
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
+            <select
+              aria-label="Demo Persona Switcher"
+              value={user?.role === 'admin' ? 'admin' : (user?.id === 'new-student-first-time-2026' ? 'new_student' : 'candidate')}
+              onChange={(e) => onSwitchPersona(e.target.value)}
+              className="bg-transparent text-purple-800 text-[11px] font-bold focus:outline-none cursor-pointer"
+            >
+              <option value="candidate">Demo: Candidate (PRASANTH)</option>
+              <option value="admin">Demo: Admin (Placement Officer)</option>
+              <option value="new_student">Demo: First-Time Student (Zero Data)</option>
+            </select>
+          </div>
+        )}
 
         {/* Quick Launch AI Coach Pill */}
         <button
