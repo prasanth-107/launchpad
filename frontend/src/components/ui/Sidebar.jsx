@@ -116,7 +116,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeTab === item.id;
+                    const isActive = activeTab === item.id || (item.id === 'career-coach' && (activeTab === 'coach' || activeTab === 'placement-copilot' || activeTab === 'ai-career-coach'));
                     return (
                       <button
                         key={item.id}

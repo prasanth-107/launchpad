@@ -8,7 +8,8 @@ import {
   Settings, 
   LogOut,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Bot
 } from 'lucide-react';
 
 export default function TopNavbar({ 
@@ -27,6 +28,11 @@ export default function TopNavbar({
   const getBreadcrumbTitle = () => {
     switch (activeTab) {
       case 'dashboard': return 'Dashboard';
+      case 'career-coach':
+      case 'coach':
+      case 'placement-copilot':
+      case 'ai-career-coach':
+        return 'AI Career Coach';
       case 'overall-report': return 'Overall Report';
       case 'placement-readiness': return 'Placement Readiness';
       case 'roadmap': return 'Learning Paths';
@@ -38,6 +44,7 @@ export default function TopNavbar({
       case 'interview-history': return 'Interview History';
       case 'resume': return 'Resume / ATS Score';
       case 'job-opportunities': return 'Job Opportunities';
+      case 'applications': return 'Application Pipeline';
       case 'skills': return 'Skills & Endorsements';
       case 'certificates': return 'Certificates';
       case 'profile': return 'Student Profile';
@@ -86,7 +93,8 @@ export default function TopNavbar({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && onNavigate) {
                 const val = e.currentTarget.value.toLowerCase();
-                if (val.includes('drive') || val.includes('job')) onNavigate('job-opportunities');
+                if (val.includes('coach') || val.includes('copilot') || val.includes('ai career')) onNavigate('career-coach');
+                else if (val.includes('drive') || val.includes('job')) onNavigate('job-opportunities');
                 else if (val.includes('test') || val.includes('assess')) onNavigate('assessments');
                 else if (val.includes('resume') || val.includes('ats')) onNavigate('resume');
                 else if (val.includes('interview') || val.includes('mock')) onNavigate('interview');
@@ -99,10 +107,20 @@ export default function TopNavbar({
           />
         </div>
 
+        {/* Quick Launch AI Coach Pill */}
+        <button
+          onClick={() => onNavigate && onNavigate('career-coach')}
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs font-semibold cursor-pointer transition-colors"
+          title="Open AI Career Coach / Placement Copilot"
+        >
+          <Bot className="w-3.5 h-3.5 text-indigo-600" />
+          <span>AI Coach</span>
+        </button>
+
         {/* Live Placement Readiness Pill */}
         <button
           onClick={() => onNavigate && onNavigate('placement-readiness')}
-          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs font-semibold cursor-pointer transition-colors"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
           title="Click to view Placement Readiness Breakdown"
         >
           <span className={`w-1.5 h-1.5 rounded-full ${readinessScore !== null && readinessScore !== undefined ? 'bg-emerald-500' : 'bg-amber-500'}`} />

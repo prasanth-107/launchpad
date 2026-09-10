@@ -52,7 +52,12 @@ export function AppShell({
             <div className="flex items-center gap-4 text-slate-500 font-medium">
               <span>Campus Drive Ready</span>
               <span>•</span>
-              <span>AI Placement Coach</span>
+              <button 
+                onClick={() => setActiveTab('career-coach')}
+                className="hover:text-indigo-600 transition-colors cursor-pointer"
+              >
+                AI Placement Coach
+              </button>
             </div>
           </div>
         </footer>

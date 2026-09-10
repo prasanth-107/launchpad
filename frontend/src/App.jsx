@@ -275,7 +275,7 @@ export default function App() {
         />
       )}
 
-      {activeTab === 'career-coach' && (
+      {(activeTab === 'career-coach' || activeTab === 'coach' || activeTab === 'placement-copilot' || activeTab === 'ai-career-coach') && (
         <CareerCoachView
           user={user}
           onNavigate={handleNavigate}

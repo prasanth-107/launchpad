@@ -246,8 +246,7 @@ export function CareerCoachView({ user, onNavigate }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6 text-left">
 
         {/* 1. Cockpit Header & Navigation */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 sm:p-6">
@@ -367,14 +366,14 @@ export function CareerCoachView({ user, onNavigate }) {
                 return (
                   <div key={msg.id} className="flex justify-end">
                     <div className="max-w-xl bg-indigo-600 text-white rounded-2xl rounded-tr-xs px-4 py-2.5 text-sm shadow-xs font-medium">
-                      {msg.content.text}
+                      {typeof msg.content === 'string' ? msg.content : (msg.content?.text || JSON.stringify(msg.content))}
                     </div>
                   </div>
                 );
               }
 
               // Assistant Structured Coach Card
-              const c = msg.content;
+              const c = typeof msg.content === 'string' ? { summary: msg.content } : (msg.content || {});
               const summary = c?.summary || 'Guidance based on current platform records.';
               const facts = c?.facts || [];
               const recommendations = c?.recommendations || [];
@@ -531,7 +530,8 @@ export function CareerCoachView({ user, onNavigate }) {
           </div>
         </div>
 
-      </div>
     </div>
   );
 }
+
+export default CareerCoachView;
