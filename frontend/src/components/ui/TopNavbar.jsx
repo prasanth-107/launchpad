@@ -100,16 +100,14 @@ export default function TopNavbar({
         </div>
 
         {/* Live Placement Readiness Pill */}
-        {readinessScore !== undefined && (
-          <button
-            onClick={() => onNavigate && onNavigate('placement-readiness')}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs font-semibold cursor-pointer transition-colors"
-            title="Click to view Placement Readiness Breakdown"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Readiness: <strong>{readinessScore}%</strong></span>
-          </button>
-        )}
+        <button
+          onClick={() => onNavigate && onNavigate('placement-readiness')}
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs font-semibold cursor-pointer transition-colors"
+          title="Click to view Placement Readiness Breakdown"
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${readinessScore !== null && readinessScore !== undefined ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+          <span>Readiness: <strong>{readinessScore !== null && readinessScore !== undefined ? `${readinessScore}%` : 'Pending'}</strong></span>
+        </button>
 
         {/* Notifications Icon with Dropdown */}
         <div className="relative">

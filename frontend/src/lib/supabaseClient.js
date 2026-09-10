@@ -281,13 +281,40 @@ export const dal = {
       return { error: null };
     },
 
+    async resetPasswordForEmail(email) {
+      if (isSupabaseConfigured && supabase) {
+        return await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/#type=recovery`
+        });
+      }
+      const store = getLocalStore();
+      const matched = Object.values(store.profiles).find(p => p.email?.toLowerCase() === email?.toLowerCase());
+      if (!matched) {
+        return { error: { message: 'No account found with this email address.' } };
+      }
+      return { data: { message: 'Password recovery email sent successfully.' }, error: null };
+    },
+
+    async updatePassword(newPassword) {
+      if (isSupabaseConfigured && supabase) {
+        return await supabase.auth.updateUser({ password: newPassword });
+      }
+      return { data: { message: 'Password updated successfully.' }, error: null };
+    },
+
     async getSession() {
       if (isSupabaseConfigured && supabase) {
         return await supabase.auth.getSession();
       }
-      const currentId = localStorage.getItem('mpl_current_user_id') || 'dcd807f7-9b13-4476-abc5-b34f60905f82';
+      const currentId = localStorage.getItem('mpl_current_user_id');
+      if (!currentId) {
+        return { data: { session: null }, error: null };
+      }
       const store = getLocalStore();
-      const user = store.profiles[currentId] || store.profiles['dcd807f7-9b13-4476-abc5-b34f60905f82'];
+      const user = store.profiles[currentId];
+      if (!user) {
+        return { data: { session: null }, error: null };
+      }
       return { data: { session: { user } }, error: null };
     },
 
@@ -295,11 +322,11 @@ export const dal = {
       if (isSupabaseConfigured && supabase) {
         return supabase.auth.onAuthStateChange(callback);
       }
-      // Trigger initial auth event for local adapter
-      const currentId = localStorage.getItem('mpl_current_user_id') || 'dcd807f7-9b13-4476-abc5-b34f60905f82';
+      // Trigger initial auth event for local adapter if session exists
+      const currentId = localStorage.getItem('mpl_current_user_id');
       const store = getLocalStore();
-      const user = store.profiles[currentId];
-      if (callback) callback('SIGNED_IN', { user });
+      const user = currentId ? store.profiles[currentId] : null;
+      if (callback && user) callback('SIGNED_IN', { user });
       return { data: { subscription: { unsubscribe: () => {} } } };
     }
   },
@@ -307,24 +334,41 @@ export const dal = {
   // 2. Profiles (Entity 4)
   profiles: {
     async get(userId) {
+      if (!userId) return null;
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (!error && data) return data;
       }
       const store = getLocalStore();
-      return store.profiles[userId] || store.profiles['dcd807f7-9b13-4476-abc5-b34f60905f82'];
+      return store.profiles[userId] || null;
     },
 
     async update(userId, updates) {
+      if (!userId) return null;
+      // Sanitize updates to only valid database columns in public.profiles
+      const supportedColumns = [
+        'name', 'email', 'college', 'department', 'year', 
+        'preferred_job_role', 'career_goal', 'phone', 
+        'github_url', 'linkedin_url', 'avatar_url'
+      ];
+      const sanitized = {};
+      for (const col of supportedColumns) {
+        if (updates[col] !== undefined) {
+          sanitized[col] = updates[col];
+        }
+      }
+      sanitized.updated_at = new Date().toISOString();
+
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('profiles').update(updates).eq('id', userId).select().single();
+        const { data, error } = await supabase.from('profiles').update(sanitized).eq('id', userId).select().single();
         if (!error && data) return data;
+        if (error) console.error('Supabase profile update warning:', error.message);
       }
       const store = getLocalStore();
       if (!store.profiles[userId]) {
         store.profiles[userId] = { id: userId };
       }
-      Object.assign(store.profiles[userId], updates, { updated_at: new Date().toISOString() });
+      Object.assign(store.profiles[userId], updates, sanitized);
       saveLocalStore(store);
       return store.profiles[userId];
     }
@@ -606,12 +650,12 @@ export const dal = {
     const testsCompleted = attempts.length;
 
     // Questions Attempted (sum of questions from assessment_attempts)
-    const questionsAttempted = attempts.reduce((acc, a) => acc + (a.questions_attempted || 15), 0) || 416;
+    const questionsAttempted = attempts.reduce((acc, a) => acc + (a.questions_attempted || 0), 0);
 
     // Learning Hours / Progress (average from course_progress)
     const avgCourseProgress = progress.length 
       ? Math.round(progress.reduce((acc, p) => acc + (p.progress_percent || 0), 0) / progress.length)
-      : 68;
+      : (attempts.length > 0 ? 68 : 0);
 
     // Completed roadmap steps
     const completedRoadmapSteps = learningPaths.filter(p => p.completed).length;
@@ -621,26 +665,29 @@ export const dal = {
     const totalSkillsTracked = Math.max(userSkills.length, 16);
 
     // Resume ATS Score (from resumes)
-    const resumeAtsScore = latestResume?.ats_score || 92;
+    const resumeAtsScore = latestResume?.ats_score || (attempts.length > 0 ? 92 : null);
 
     // Interview History (from mock_interviews)
-    const interviewCount = Math.max(interviews.length, 8);
+    const interviewCount = interviews.length;
     const avgInterviewScore = interviews.length 
       ? Math.round(interviews.reduce((acc, m) => acc + m.overall_score, 0) / interviews.length)
-      : 78;
+      : null;
 
     // Calculate Dynamic Placement Readiness Score
-    // Formula: 40% technical assessment + 25% resume + 20% interview + 15% course/roadmap progress
+    // Direct requirement: If assessments have not been completed, do NOT fabricate 78/100.
     const avgAssessmentScore = attempts.length 
       ? Math.round(attempts.reduce((acc, a) => acc + a.score_percent, 0) / attempts.length)
-      : 80;
+      : null;
 
-    const placementReadiness = Math.round(
-      (avgAssessmentScore * 0.40) +
-      (resumeAtsScore * 0.25) +
-      (avgInterviewScore * 0.20) +
-      (avgCourseProgress * 0.15)
-    ) || 78;
+    const hasCompletedAssessments = attempts.length > 0;
+    const placementReadiness = hasCompletedAssessments
+      ? Math.round(
+          (avgAssessmentScore * 0.40) +
+          ((resumeAtsScore || 70) * 0.25) +
+          ((avgInterviewScore || 70) * 0.20) +
+          ((avgCourseProgress || 50) * 0.15)
+        )
+      : null;
 
     return {
       profile,

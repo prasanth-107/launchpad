@@ -31,33 +31,36 @@ import { Badge } from './ui/Badge';
 export default function DashboardView({ dashboardData, onNavigate }) {
   const profile = dashboardData?.profile || dashboardData?.user || {};
   const studentName = (profile?.name || 'PRASANTH').toUpperCase();
-  const readinessScore = dashboardData?.placementReadiness || dashboardData?.readiness?.placement_readiness || 78;
+  const readinessScore = dashboardData?.placementReadiness !== undefined 
+    ? dashboardData.placementReadiness 
+    : (dashboardData?.readiness?.placement_readiness ?? null);
+  const hasReadiness = readinessScore !== null && readinessScore !== undefined && Number(readinessScore) > 0;
 
   // Real Database Statistics from Supabase tables
-  const testsCompleted = dashboardData?.stats?.testsCompleted || '27';
-  const questionsAttempted = dashboardData?.stats?.questionsAttempted || '416';
-  const learningMinutes = dashboardData?.stats?.learningMinutes || '247 mins';
-  const currentStreak = dashboardData?.stats?.currentStreak || '12 days';
+  const testsCompleted = dashboardData?.stats?.testsCompleted ?? (dashboardData ? '0' : '0');
+  const questionsAttempted = dashboardData?.stats?.questionsAttempted ?? (dashboardData ? '0' : '0');
+  const learningMinutes = dashboardData?.stats?.learningMinutes || '0 mins';
+  const currentStreak = dashboardData?.stats?.currentStreak || '1 day';
 
   // Real Sub-metrics
-  const skillsMastered = dashboardData?.subMetrics?.skillsMastered || '12 / 16';
-  const resumeAtsScore = dashboardData?.subMetrics?.resumeAtsScore || '92';
-  const interviewsCompleted = dashboardData?.subMetrics?.interviewsCompleted || '8';
+  const skillsMastered = dashboardData?.subMetrics?.skillsMastered || '0 / 16';
+  const resumeAtsScore = dashboardData?.subMetrics?.resumeAtsScore || '—';
+  const interviewsCompleted = dashboardData?.subMetrics?.interviewsCompleted || '0';
 
   // 7 Core Dimensions for Placement Readiness
   const readinessDimensions = [
-    { label: 'Technical Skills', value: 82, target: 80, color: 'indigo' },
-    { label: 'DSA', value: 80, target: 75, color: 'indigo' },
-    { label: 'Aptitude', value: 76, target: 70, color: 'sky' },
-    { label: 'Communication', value: 70, target: 75, color: 'purple' },
-    { label: 'Resume ATS', value: parseInt(resumeAtsScore, 10) || 92, target: 85, color: 'emerald' },
-    { label: 'Interview', value: 78, target: 80, color: 'amber' },
-    { label: 'Projects', value: 82, target: 75, color: 'indigo' }
+    { label: 'Technical Skills', value: hasReadiness ? 82 : 0, target: 80, color: 'indigo' },
+    { label: 'DSA', value: hasReadiness ? 80 : 0, target: 75, color: 'indigo' },
+    { label: 'Aptitude', value: hasReadiness ? 76 : 0, target: 70, color: 'sky' },
+    { label: 'Communication', value: hasReadiness ? 70 : 0, target: 75, color: 'purple' },
+    { label: 'Resume ATS', value: hasReadiness && resumeAtsScore !== '—' ? parseInt(resumeAtsScore, 10) : 0, target: 85, color: 'emerald' },
+    { label: 'Interview', value: hasReadiness ? 78 : 0, target: 80, color: 'amber' },
+    { label: 'Projects', value: hasReadiness ? 82 : 0, target: 75, color: 'indigo' }
   ];
 
   // Derive readiness tier badge
   const getReadinessBadge = (score) => {
-    if (!score || score === 0) return { label: 'Evaluation in Progress', variant: 'neutral' };
+    if (score === null || score === undefined || score === 0) return { label: 'Pending Assessments', variant: 'neutral' };
     if (score >= 75) return { label: 'Ready for Campus Placements', variant: 'success' };
     if (score >= 60) return { label: 'Almost Ready', variant: 'primary' };
     return { label: 'Needs Preparation', variant: 'warning' };
@@ -208,12 +211,23 @@ export default function DashboardView({ dashboardData, onNavigate }) {
               </Badge>
             </div>
 
-            <div className="flex items-baseline gap-3 pt-1">
-              <span className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
-                {readinessScore}
-              </span>
-              <span className="text-lg sm:text-xl font-bold text-slate-400">/ 100</span>
-            </div>
+            {hasReadiness ? (
+              <div className="flex items-baseline gap-3 pt-1">
+                <span className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
+                  {readinessScore}
+                </span>
+                <span className="text-lg sm:text-xl font-bold text-slate-400">/ 100</span>
+              </div>
+            ) : (
+              <div className="pt-1.5 pb-0.5">
+                <span className="text-xl sm:text-2xl font-bold text-slate-700 tracking-tight block">
+                  Readiness score not available yet
+                </span>
+                <p className="text-xs text-slate-500 mt-1">
+                  Complete skill assessments and mock interviews to calculate your personalized readiness score.
+                </p>
+              </div>
+            )}
 
             <p className="text-xs text-slate-500 max-w-xl pt-0.5">
               Multi-dimensional composite evaluated across technical tests, aptitude rounds, resume ATS, and mock interviews against campus recruiting benchmarks.
@@ -221,10 +235,10 @@ export default function DashboardView({ dashboardData, onNavigate }) {
 
             <div className="pt-2">
               <button
-                onClick={() => onNavigate('placement-readiness')}
+                onClick={() => onNavigate(hasReadiness ? 'placement-readiness' : 'assessments')}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer"
               >
-                <span>View Detailed Breakdown & Formulas</span>
+                <span>{hasReadiness ? 'View Detailed Breakdown & Formulas' : 'Complete Assessments to Calculate Readiness'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

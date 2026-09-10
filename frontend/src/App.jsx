@@ -13,6 +13,7 @@ import ResumeAnalysisView from './components/ResumeAnalysisView';
 import JobOpportunitiesView from './components/JobOpportunitiesView';
 import SkillsCertificatesView from './components/SkillsCertificatesView';
 import ProfileSettingsView from './components/ProfileSettingsView';
+import AuthView from './components/AuthView';
 import AuthModal from './components/AuthModal';
 import { apiClient } from './api/client';
 import { dal } from './lib/supabaseClient';
@@ -23,19 +24,10 @@ export default function App() {
   const [dashboardData, setDashboardData] = useState(null);
   const [notification, setNotification] = useState('');
   const [contentCategory, setContentCategory] = useState('programming');
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // Default professional student state ("PRASANTH")
-  const [user, setUser] = useState({
-    id: 'dcd807f7-9b13-4476-abc5-b34f60905f82',
-    name: 'PRASANTH',
-    email: 'prasanth@university.edu',
-    college: 'Stanford Institute of Technology',
-    department: 'Computer Science & Engineering',
-    year: '4th Year / Final',
-    preferred_job_role: 'Full Stack Software Engineer',
-    career_goal: 'Crack SDE-1 placement drive at Tier-1 tech company',
-    skills: ['Python', 'JavaScript', 'React', 'SQL', 'Git', 'DSA']
-  });
+  // Authenticated user state (null when unauthenticated)
+  const [user, setUser] = useState(null);
 
   const showNotification = (msg) => {
     setNotification(msg);
@@ -50,7 +42,7 @@ export default function App() {
       if (dbMetrics) {
         setDashboardData(dbMetrics);
         if (dbMetrics.profile) {
-          setUser(prev => ({ ...prev, ...dbMetrics.profile }));
+          setUser(prev => prev ? ({ ...prev, ...dbMetrics.profile }) : prev);
         }
       }
     } catch (err) {
@@ -65,41 +57,90 @@ export default function App() {
   };
 
   useEffect(() => {
-    // 1. Restore active Supabase session
-    dal.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) {
-        const authed = data.session.user;
-        setUser(prev => ({
-          ...prev,
-          id: authed.id || prev.id,
-          name: authed.name || authed.user_metadata?.name || prev.name,
-          email: authed.email || prev.email,
-          college: authed.college || prev.college,
-          department: authed.department || prev.department,
-          year: authed.year || prev.year,
-          preferred_job_role: authed.preferred_job_role || prev.preferred_job_role
-        }));
-        refreshDashboard(authed.id);
-      } else {
-        refreshDashboard(user.id);
-      }
-    });
+    let isMounted = true;
 
-    // 2. Subscribe to auth changes
-    const { data: authListener } = dal.auth.onAuthStateChange((event, session) => {
+    const initAuth = async () => {
+      try {
+        // 1. Check for active Supabase Auth session
+        const { data: sessionData } = await dal.auth.getSession();
+        const activeSupabaseUser = sessionData?.session?.user;
+
+        if (activeSupabaseUser) {
+          const profile = await dal.profiles.get(activeSupabaseUser.id);
+          const resolvedUser = {
+            id: activeSupabaseUser.id,
+            email: activeSupabaseUser.email,
+            name: profile?.name || activeSupabaseUser.user_metadata?.name || 'PRASANTH',
+            college: profile?.college || 'Stanford Institute of Technology',
+            department: profile?.department || 'Computer Science & Engineering',
+            year: profile?.year || '4th Year / Final',
+            preferred_job_role: profile?.preferred_job_role || 'Full Stack Software Engineer',
+            career_goal: profile?.career_goal || 'Crack SDE-1 placement drive at Tier-1 tech company',
+            skills: profile?.skills || ['Python', 'JavaScript', 'React', 'SQL', 'Git', 'DSA']
+          };
+          if (isMounted) {
+            setUser(resolvedUser);
+            localStorage.setItem('mpl_current_user', JSON.stringify(resolvedUser));
+            refreshDashboard(resolvedUser.id);
+          }
+        } else {
+          // 2. Check for locally remembered session (e.g., from evaluator demo)
+          const storedUserStr = localStorage.getItem('mpl_current_user');
+          if (storedUserStr) {
+            try {
+              const parsed = JSON.parse(storedUserStr);
+              if (parsed?.id && isMounted) {
+                setUser(parsed);
+                refreshDashboard(parsed.id);
+              }
+            } catch (e) {
+              localStorage.removeItem('mpl_current_user');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Auth session resolution note:', err);
+      } finally {
+        if (isMounted) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    initAuth();
+
+    // 3. Subscribe to real-time auth events
+    const { data: authListener } = dal.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         const u = session.user;
-        setUser(prev => ({
-          ...prev,
-          id: u.id || prev.id,
-          name: u.name || u.user_metadata?.name || prev.name,
-          email: u.email || prev.email
-        }));
-        refreshDashboard(u.id);
+        const profile = await dal.profiles.get(u.id);
+        const resolvedUser = {
+          id: u.id,
+          email: u.email,
+          name: profile?.name || u.user_metadata?.name || 'PRASANTH',
+          college: profile?.college || 'Stanford Institute of Technology',
+          department: profile?.department || 'Computer Science & Engineering',
+          year: profile?.year || '4th Year / Final',
+          preferred_job_role: profile?.preferred_job_role || 'Full Stack Software Engineer',
+          career_goal: profile?.career_goal || 'Crack SDE-1 placement drive at Tier-1 tech company',
+          skills: profile?.skills || ['Python', 'JavaScript', 'React', 'SQL', 'Git', 'DSA']
+        };
+        if (isMounted) {
+          setUser(resolvedUser);
+          localStorage.setItem('mpl_current_user', JSON.stringify(resolvedUser));
+          refreshDashboard(u.id);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setUser(null);
+          localStorage.removeItem('mpl_current_user');
+          setDashboardData(null);
+        }
       }
     });
 
     return () => {
+      isMounted = false;
       if (authListener?.subscription?.unsubscribe) {
         authListener.subscription.unsubscribe();
       }
@@ -107,16 +148,34 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
-    await dal.auth.signOut();
+    try {
+      await dal.auth.signOut();
+    } catch (e) {
+      console.warn('Sign out notice:', e);
+    }
+    localStorage.removeItem('mpl_current_user');
+    setUser(null);
+    setDashboardData(null);
     showNotification('Signed out of student session.');
-    setAuthModalOpen(true);
   };
 
   const handleAuthSuccess = (authedUser) => {
-    setUser({ ...authedUser, name: authedUser.name || 'PRASANTH' });
+    const cleanUser = {
+      id: authedUser.id || 'dcd807f7-9b13-4476-abc5-b34f60905f82',
+      name: authedUser.name || authedUser.user_metadata?.name || 'PRASANTH',
+      email: authedUser.email || 'prasanth@university.edu',
+      college: authedUser.college || 'Stanford Institute of Technology',
+      department: authedUser.department || 'Computer Science & Engineering',
+      year: authedUser.year || '4th Year / Final',
+      preferred_job_role: authedUser.preferred_job_role || 'Full Stack Software Engineer',
+      career_goal: authedUser.career_goal || 'Crack SDE-1 placement drive at Tier-1 tech company',
+      skills: authedUser.skills || ['Python', 'JavaScript', 'React', 'SQL', 'Git', 'DSA']
+    };
+    setUser(cleanUser);
+    localStorage.setItem('mpl_current_user', JSON.stringify(cleanUser));
     setActiveTab('dashboard');
-    refreshDashboard(authedUser.id);
-    showNotification(`Welcome, ${authedUser.name || 'PRASANTH'}!`);
+    refreshDashboard(cleanUser.id);
+    showNotification(`Welcome, ${cleanUser.name}!`);
   };
 
   const handleAssessmentCompleted = async (result) => {
@@ -160,8 +219,27 @@ export default function App() {
     refreshDashboard(user.id);
   };
 
-  const readinessScore = dashboardData?.placementReadiness || dashboardData?.readiness?.placement_readiness || 78;
+  const readinessScore = dashboardData?.placementReadiness ?? dashboardData?.readiness?.placement_readiness ?? null;
 
+  // 1. Session Verification Loading State (Prevents flash of protected content)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center font-sans antialiased text-slate-800">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md animate-pulse mb-4">
+          <span className="font-black text-xl">MP</span>
+        </div>
+        <p className="text-sm font-semibold text-slate-700">Verifying Placement Portal Session...</p>
+        <p className="text-xs text-slate-400 mt-1">Connecting to Supabase PostgreSQL & Auth</p>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated State: Render SaaS Full-Page Authentication View
+  if (!user) {
+    return <AuthView onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // 3. Authenticated State: Render SaaS AppShell & Modules
   return (
     <AppShell
       activeTab={activeTab}

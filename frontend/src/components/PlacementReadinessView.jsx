@@ -16,13 +16,16 @@ import { Badge } from './ui/Badge';
 
 export default function PlacementReadinessView({ dashboardData, onNavigate }) {
   const readiness = dashboardData?.readiness || {};
-  const score = readiness.placement_readiness || 78;
+  const score = dashboardData?.placementReadiness !== undefined 
+    ? dashboardData.placementReadiness 
+    : (readiness.placement_readiness ?? null);
+  const hasScore = score !== null && score !== undefined && Number(score) > 0;
 
   const dimensions = [
     {
       name: 'Technical Skills',
       weight: '25%',
-      score: readiness.technical_score || 80,
+      score: hasScore ? (readiness.technical_score || 80) : 0,
       benchmark: '80%',
       color: 'indigo',
       desc: 'Algorithms, Data Structures, OOP, SQL, and system problem-solving.'
@@ -30,7 +33,7 @@ export default function PlacementReadinessView({ dashboardData, onNavigate }) {
     {
       name: 'Quantitative Aptitude & Logic',
       weight: '20%',
-      score: readiness.aptitude_score || 72,
+      score: hasScore ? (readiness.aptitude_score || 72) : 0,
       benchmark: '75%',
       color: 'sky',
       desc: 'Speed math, analytical puzzle resolution, and logical deductions.'
@@ -38,7 +41,7 @@ export default function PlacementReadinessView({ dashboardData, onNavigate }) {
     {
       name: 'Communication & Presentation',
       weight: '15%',
-      score: readiness.communication_score || 65,
+      score: hasScore ? (readiness.communication_score || 65) : 0,
       benchmark: '70%',
       color: 'purple',
       desc: 'STAR framework fluency, articulate expression, and active listening.'
@@ -46,7 +49,7 @@ export default function PlacementReadinessView({ dashboardData, onNavigate }) {
     {
       name: 'Mock Interview Performance',
       weight: '15%',
-      score: readiness.interview_score || 75,
+      score: hasScore ? (readiness.interview_score || 75) : 0,
       benchmark: '75%',
       color: 'amber',
       desc: 'Confidence, technical depth, and answer relevance in live simulations.'
@@ -54,7 +57,7 @@ export default function PlacementReadinessView({ dashboardData, onNavigate }) {
     {
       name: 'Resume ATS Verification',
       weight: '15%',
-      score: readiness.resume_score || 92,
+      score: hasScore ? (readiness.resume_score || 92) : 0,
       benchmark: '85%',
       color: 'emerald',
       desc: 'Role keyword density, measurable metrics, and clean formatting.'
@@ -62,7 +65,7 @@ export default function PlacementReadinessView({ dashboardData, onNavigate }) {
     {
       name: 'Projects & Applied Portfolio',
       weight: '10%',
-      score: 82,
+      score: hasScore ? 82 : 0,
       benchmark: '75%',
       color: 'indigo',
       desc: 'Production deployment, clean GitHub repositories, and architectural complexity.'
@@ -89,16 +92,29 @@ export default function PlacementReadinessView({ dashboardData, onNavigate }) {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               OVERALL PLACEMENT READINESS
             </span>
-            <div className="flex items-baseline gap-3 mt-1">
-              <span className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tight">
-                {score}%
-              </span>
-              <Badge variant={score >= 75 ? 'success' : 'primary'} size="md">
-                {score >= 75 ? 'Ready for Campus Placements' : 'Almost Ready'}
-              </Badge>
-            </div>
+            {hasScore ? (
+              <div className="flex items-baseline gap-3 mt-1">
+                <span className="text-5xl sm:text-6xl font-black text-slate-900 tracking-tight">
+                  {score}%
+                </span>
+                <Badge variant={score >= 75 ? 'success' : 'primary'} size="md">
+                  {score >= 75 ? 'Ready for Campus Placements' : 'Almost Ready'}
+                </Badge>
+              </div>
+            ) : (
+              <div className="mt-2 mb-1">
+                <span className="text-2xl sm:text-3xl font-bold text-slate-700 tracking-tight block">
+                  Readiness score not available yet
+                </span>
+                <Badge variant="neutral" size="sm" className="mt-1.5">
+                  Assessments Required
+                </Badge>
+              </div>
+            )}
             <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-xl">
-              You meet the qualification threshold for Tier-1 and Tier-2 product engineering recruitment drives. Strengthen Communication to hit the top 10% bracket.
+              {hasScore 
+                ? 'You meet the qualification threshold for Tier-1 and Tier-2 product engineering recruitment drives. Strengthen Communication to hit the top 10% bracket.'
+                : 'Complete assessments to calculate your readiness score and benchmark your competencies against campus recruiters.'}
             </p>
           </div>
 
