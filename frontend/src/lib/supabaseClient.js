@@ -5,6 +5,14 @@
  * and a high-fidelity persistent adapter for offline evaluation.
  */
 import { createClient } from '@supabase/supabase-js';
+import {
+  generateDailyPreparationPlan,
+  determinePreparationMode,
+  computePreparationStreak,
+  computeWeeklySummary,
+  generatePreparationInsights
+} from './dailyPreparationEngine.js';
+
 import { computeSkillGaps } from './skillGapEngine';
 import { computePlacementReadiness } from './placementReadinessEngine';
 import { generatePersonalizedLearningPath } from './learningPathEngine';
@@ -198,7 +206,9 @@ function initDefaultStore() {
     // 14. tracked_applications (user-scoped application tracking clicks)
     tracked_applications: [],
     // 15. readiness_snapshots (Entity 18 historical readiness audits)
-    readiness_snapshots: []
+    readiness_snapshots: [],
+    // 16. preparation_actions (Entity 19 daily plan action tracking)
+    preparation_actions: []
   };
 
   saveLocalStore(initialStore);
@@ -1739,6 +1749,148 @@ export const dal = {
         assessmentAnalytics,
         applicationPipeline,
         insights
+      };
+    }
+  }
+,
+  // 17. Placement Preparation Workspace & Daily Action Plan (Phase 13)
+  preparation: {
+    async getCompletedActions(userId, actionDate = null) {
+      if (isSupabaseConfigured && supabase) {
+        let query = supabase
+          .from('preparation_actions')
+          .select('*')
+          .eq('user_id', userId);
+        if (actionDate) {
+          query = query.eq('action_date', actionDate);
+        }
+        const { data, error } = await query;
+        if (!error && data) return data;
+      }
+      const store = getLocalStore();
+      const actions = store.preparation_actions || [];
+      return actions.filter(a => a.user_id === userId && (!actionDate || a.action_date === actionDate));
+    },
+
+    async toggleAction(userId, actionKey, completed = true) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('preparation_actions')
+          .upsert({
+            user_id: userId,
+            action_key: actionKey,
+            action_date: today,
+            completed: Boolean(completed),
+            completed_at: new Date().toISOString()
+          }, { onConflict: 'user_id,action_key,action_date' })
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
+
+      const store = getLocalStore();
+      if (!store.preparation_actions) store.preparation_actions = [];
+      const existingIdx = store.preparation_actions.findIndex(
+        a => a.user_id === userId && a.action_key === actionKey && a.action_date === today
+      );
+
+      let record;
+      if (existingIdx >= 0) {
+        store.preparation_actions[existingIdx].completed = Boolean(completed);
+        store.preparation_actions[existingIdx].completed_at = new Date().toISOString();
+        record = store.preparation_actions[existingIdx];
+      } else {
+        record = {
+          id: `pa-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          user_id: userId,
+          action_key: actionKey,
+          action_date: today,
+          completed: Boolean(completed),
+          completed_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        };
+        store.preparation_actions.push(record);
+      }
+      saveLocalStore(store);
+      return record;
+    },
+
+    async getPreparationData(userId) {
+      const [
+        profile,
+        attempts,
+        userSkills,
+        learningPaths,
+        courses,
+        courseProgress,
+        resumes,
+        interviews,
+        applications,
+        completedActions
+      ] = await Promise.all([
+        dal.profiles.get(userId),
+        dal.assessment_attempts.getByUser(userId),
+        dal.user_skills.getByUser(userId),
+        dal.learning_paths.getByUser(userId),
+        dal.courses.getAll(),
+        dal.course_progress.getByUser(userId),
+        dal.resumes.getByUser(userId),
+        dal.mock_interviews.getByUser(userId),
+        dal.applications.getAll(userId),
+        this.getCompletedActions(userId)
+      ]);
+
+      const readinessReport = computePlacementReadiness({
+        attempts,
+        userSkills,
+        resumes,
+        interviews,
+        progress: courseProgress,
+        profile
+      });
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayActions = (completedActions || []).filter(a => a.action_date === todayStr && a.completed);
+
+      const candidateContext = {
+        profile,
+        attempts,
+        userSkills,
+        learningPaths,
+        courses,
+        courseProgress,
+        resumes,
+        latestResume: resumes && resumes.length > 0 ? resumes[0] : null,
+        interviews,
+        applications,
+        readinessReport,
+        completedActions: todayActions
+      };
+
+      const dailyPlan = generateDailyPreparationPlan(candidateContext);
+      const streak = computePreparationStreak((completedActions || []).filter(a => a.completed));
+      const weeklySummary = computeWeeklySummary({
+        attempts,
+        resumes,
+        interviews,
+        applications,
+        completedActions: (completedActions || []).filter(a => a.completed)
+      });
+      const insights = generatePreparationInsights(candidateContext);
+
+      return {
+        userId,
+        profile,
+        readinessReport,
+        dailyPlan,
+        streak,
+        weeklySummary,
+        insights,
+        applications,
+        learningPaths,
+        courseProgress,
+        attempts
       };
     }
   }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
+  CalendarCheck, 
   BarChart3, 
   Target, 
   Compass, 
@@ -29,6 +30,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
       title: 'OVERVIEW',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'preparation', label: 'Preparation Workspace', icon: CalendarCheck },
         { id: 'career-coach', label: 'AI Career Coach', icon: Bot },
         { id: 'skill-gap', label: 'Skill Gap Analysis', icon: Target },
         { id: 'placement-readiness', label: 'Placement Readiness', icon: Sparkles },
@@ -118,6 +120,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
                     const Icon = item.icon;
                     const isActive = activeTab === item.id || 
                       (item.id === 'career-coach' && (activeTab === 'coach' || activeTab === 'placement-copilot' || activeTab === 'ai-career-coach')) ||
+                      (item.id === 'preparation' && activeTab === 'daily-plan') ||
                       (item.id === 'analytics' && (activeTab === 'overall-report' || activeTab === 'progress'));
                     return (
                       <button

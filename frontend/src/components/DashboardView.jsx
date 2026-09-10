@@ -27,6 +27,7 @@ import {
   Bot,
   BarChart3
 } from 'lucide-react';
+import { generateDailyPreparationPlan } from '../lib/dailyPreparationEngine';
 import { StatCard } from './ui/StatCard';
 import { ProgressBar } from './ui/ProgressBar';
 import { Badge } from './ui/Badge';
@@ -104,6 +105,23 @@ export default function DashboardView({ dashboardData, onNavigate }) {
   const selectedAppsCount = pipelineStats?.selectedCount ?? 0;
 
   // 7 Core Dimensions for Placement Readiness from Centralized Engine (Zero Hardcoded values)
+  
+  // Phase 13 Daily Preparation Plan Engine Integration
+  const dailyPlanResult = generateDailyPreparationPlan({
+    readinessReport,
+    userSkills: dashboardData?.userSkills || [],
+    attempts: dashboardData?.attempts || [],
+    learningPaths: dashboardData?.learningPaths || [],
+    courses: dashboardData?.courses || [],
+    courseProgress: dashboardData?.courseProgress || [],
+    resumes: dashboardData?.resumes || [],
+    interviews: dashboardData?.interviews || [],
+    applications: dashboardData?.applications || [],
+    profile
+  });
+  const todayTopAction = dailyPlanResult?.topPriority || null;
+  const todaySecondaryActions = (dailyPlanResult?.plan || []).slice(1, 4);
+
   const readinessDimensions = (readinessReport?.pillars || [
     { id: 'tech', shortName: 'Technical Skills', baseWeight: 20, targetBenchmark: 80, color: 'indigo' },
     { id: 'dsa', shortName: 'DSA', baseWeight: 15, targetBenchmark: 75, color: 'indigo' },
@@ -304,6 +322,117 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           <span>View Full Analytics</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </button>
+      </div>
+
+      
+      {/* 1D. YOUR PREPARATION PLAN Section (Phase 13 Preparation Workspace) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 text-indigo-600">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">YOUR PREPARATION PLAN</span>
+                <Badge variant={dailyPlanResult?.mode?.badgeVariant || 'primary'} size="xs">
+                  {dailyPlanResult?.mode?.title || 'Daily Plan'}
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {dailyPlanResult?.mode?.headline || 'Targeted daily actions based on your authentic readiness gaps.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigate('preparation')}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
+          >
+            <span>Open Preparation Workspace</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Top Priority Action + Secondary Actions Grid */}
+        {todayTopAction ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 pt-1">
+            {/* Today's Top Action (7 Cols) */}
+            <div className="lg:col-span-7 p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                      TOP PRIORITY • {todayTopAction.priority}
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase">
+                      {todayTopAction.category}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    ~{todayTopAction.estimated_minutes} min
+                  </span>
+                </div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  {todayTopAction.title}
+                </h4>
+                <p className="text-xs text-slate-600 line-clamp-2">
+                  {todayTopAction.reason}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+                <span className="text-[11px] text-slate-400">Source: <strong>{todayTopAction.source}</strong></span>
+                <button
+                  onClick={() => onNavigate(todayTopAction.destination)}
+                  className="font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{todayTopAction.actionLabel || 'Start Action'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Secondary Actions (5 Cols) */}
+            <div className="lg:col-span-5 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-700">Recommended Next Steps:</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {dailyPlanResult?.totalActions || 0} Actions Planned
+                </span>
+              </div>
+
+              {todaySecondaryActions.length === 0 ? (
+                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-500 text-center">
+                  Top priority action recommended. Complete it to unlock further steps.
+                </div>
+              ) : (
+                todaySecondaryActions.map((act, i) => (
+                  <div
+                    key={act.id || i}
+                    onClick={() => onNavigate(act.destination)}
+                    className="p-2.5 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                          {act.priority}
+                        </span>
+                        <span className="font-bold text-slate-800 truncate">{act.title}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{act.reason}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="py-4 text-center text-xs text-slate-500">
+            Complete your initial assessment to generate your personalized preparation plan.
+          </div>
+        )}
       </div>
 
       {/* 2. Primary Metric Hero Card: PLACEMENT READINESS (7 Dimensions) */}

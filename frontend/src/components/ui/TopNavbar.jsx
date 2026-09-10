@@ -28,10 +28,14 @@ export default function TopNavbar({
   const getBreadcrumbTitle = () => {
     switch (activeTab) {
       case 'dashboard': return 'Dashboard';
+      case 'preparation':
+      case 'daily-plan':
+        return 'Preparation Workspace';
       case 'career-coach':
       case 'coach':
       case 'placement-copilot':
       case 'ai-career-coach':
+        return 'AI Career Coach';
       case 'analytics':
       case 'overall-report':
       case 'progress':

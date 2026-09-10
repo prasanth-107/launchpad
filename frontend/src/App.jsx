@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell } from './components/ui/AppShell';
 import DashboardView from './components/DashboardView';
+import PreparationWorkspaceView from './components/PreparationWorkspaceView';
 import AnalyticsView from './components/AnalyticsView';
 import OverallReportView from './components/OverallReportView';
 import PlacementReadinessView from './components/PlacementReadinessView';
@@ -269,6 +270,13 @@ export default function App() {
       )}
 
       {/* View Routing */}
+      {(activeTab === 'preparation' || activeTab === 'daily-plan') && (
+        <PreparationWorkspaceView
+          user={user}
+          onNavigate={handleNavigate}
+        />
+      )}
+
       {activeTab === 'dashboard' && (
         <DashboardView
           dashboardData={dashboardData}
