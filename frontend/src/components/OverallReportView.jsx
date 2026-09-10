@@ -15,8 +15,9 @@ import { ProgressBar } from './ui/ProgressBar';
 import { Badge } from './ui/Badge';
 
 export default function OverallReportView({ dashboardData }) {
-  const readiness = dashboardData?.readiness || {};
-  const overallScore = readiness.placement_readiness || 78;
+  const readiness = dashboardData?.readinessReport || dashboardData?.readiness || {};
+  const overallScore = readiness.score ?? readiness.placement_readiness ?? null;
+  const hasScore = overallScore !== null && overallScore !== undefined;
 
   // Monthly readiness progression
   const monthlyTrend = [
@@ -24,7 +25,7 @@ export default function OverallReportView({ dashboardData }) {
     { month: 'Jun', score: 54 },
     { month: 'Jul', score: 62 },
     { month: 'Aug', score: 71 },
-    { month: 'Sep (Current)', score: overallScore }
+    { month: 'Sep (Current)', score: hasScore ? overallScore : null }
   ];
 
   // Assessment score distribution
@@ -115,12 +116,16 @@ export default function OverallReportView({ dashboardData }) {
         <div className="grid grid-cols-5 gap-4 pt-8 pb-4 items-end max-w-2xl mx-auto h-48">
           {monthlyTrend.map((item, idx) => (
             <div key={idx} className="flex flex-col items-center gap-2 h-full justify-end">
-              <span className="text-xs font-bold text-slate-700">{item.score}%</span>
+              <span className="text-xs font-bold text-slate-700">
+                {item.score !== null ? `${item.score}%` : '—'}
+              </span>
               <div 
                 className={`w-full max-w-[48px] rounded-t-lg transition-all ${
-                  idx === monthlyTrend.length - 1 ? 'bg-indigo-600' : 'bg-indigo-200 hover:bg-indigo-300'
+                  idx === monthlyTrend.length - 1 
+                    ? (item.score !== null ? 'bg-indigo-600' : 'bg-slate-200') 
+                    : 'bg-indigo-200 hover:bg-indigo-300'
                 }`}
-                style={{ height: `${item.score * 1.5}px` }}
+                style={{ height: `${(item.score || 0) * 1.5}px` }}
               />
               <span className="text-[11px] font-medium text-slate-500 whitespace-nowrap mt-1">{item.month}</span>
             </div>

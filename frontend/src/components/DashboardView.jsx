@@ -31,10 +31,11 @@ import { Badge } from './ui/Badge';
 export default function DashboardView({ dashboardData, onNavigate }) {
   const profile = dashboardData?.profile || dashboardData?.user || {};
   const studentName = (profile?.name || 'PRASANTH').toUpperCase();
-  const readinessScore = dashboardData?.placementReadiness !== undefined 
-    ? dashboardData.placementReadiness 
-    : (dashboardData?.readiness?.placement_readiness ?? null);
-  const hasReadiness = readinessScore !== null && readinessScore !== undefined && Number(readinessScore) > 0;
+
+  // Centralized Readiness Report from placementReadinessEngine
+  const readinessReport = dashboardData?.readinessReport || dashboardData?.readiness || null;
+  const readinessScore = readinessReport?.score ?? (dashboardData?.placementReadiness ?? null);
+  const hasReadiness = readinessScore !== null && readinessScore !== undefined;
 
   // Real Database Statistics from Supabase tables
   const testsCompleted = dashboardData?.stats?.testsCompleted ?? (dashboardData ? '0' : '0');
@@ -47,26 +48,31 @@ export default function DashboardView({ dashboardData, onNavigate }) {
   const resumeAtsScore = dashboardData?.subMetrics?.resumeAtsScore || '—';
   const interviewsCompleted = dashboardData?.subMetrics?.interviewsCompleted || '0';
 
-  // 7 Core Dimensions for Placement Readiness
-  const readinessDimensions = [
-    { label: 'Technical Skills', value: hasReadiness ? 82 : 0, target: 80, color: 'indigo' },
-    { label: 'DSA', value: hasReadiness ? 80 : 0, target: 75, color: 'indigo' },
-    { label: 'Aptitude', value: hasReadiness ? 76 : 0, target: 70, color: 'sky' },
-    { label: 'Communication', value: hasReadiness ? 70 : 0, target: 75, color: 'purple' },
-    { label: 'Resume ATS', value: hasReadiness && resumeAtsScore !== '—' ? parseInt(resumeAtsScore, 10) : 0, target: 85, color: 'emerald' },
-    { label: 'Interview', value: hasReadiness ? 78 : 0, target: 80, color: 'amber' },
-    { label: 'Projects', value: hasReadiness ? 82 : 0, target: 75, color: 'indigo' }
-  ];
+  // 7 Core Dimensions for Placement Readiness from Centralized Engine (Zero Hardcoded values)
+  const readinessDimensions = (readinessReport?.pillars || [
+    { id: 'tech', shortName: 'Technical Skills', baseWeight: 20, targetBenchmark: 80, color: 'indigo' },
+    { id: 'dsa', shortName: 'DSA', baseWeight: 15, targetBenchmark: 75, color: 'indigo' },
+    { id: 'aptitude', shortName: 'Aptitude', baseWeight: 15, targetBenchmark: 70, color: 'sky' },
+    { id: 'communication', shortName: 'Communication', baseWeight: 10, targetBenchmark: 70, color: 'purple' },
+    { id: 'resume', shortName: 'Resume ATS', baseWeight: 15, targetBenchmark: 85, color: 'emerald' },
+    { id: 'interview', shortName: 'Interview', baseWeight: 15, targetBenchmark: 80, color: 'amber' },
+    { id: 'projects', shortName: 'Projects', baseWeight: 10, targetBenchmark: 75, color: 'indigo' }
+  ]).map(p => ({
+    label: p.shortName || p.name,
+    value: p.available ? p.score : 0,
+    available: Boolean(p.available),
+    target: p.targetBenchmark,
+    color: p.color
+  }));
 
-  // Derive readiness tier badge
-  const getReadinessBadge = (score) => {
-    if (score === null || score === undefined || score === 0) return { label: 'Pending Assessments', variant: 'neutral' };
-    if (score >= 75) return { label: 'Ready for Campus Placements', variant: 'success' };
-    if (score >= 60) return { label: 'Almost Ready', variant: 'primary' };
-    return { label: 'Needs Preparation', variant: 'warning' };
+  // Status badge directly from centralized readiness engine
+  const statusBadge = hasReadiness && readinessReport ? {
+    label: readinessReport.status,
+    variant: readinessReport.statusTier?.variant || 'primary'
+  } : {
+    label: 'Assessment in Progress',
+    variant: 'neutral'
   };
-
-  const statusBadge = getReadinessBadge(readinessScore);
 
   // Core Learning Progress items
   const learningTopics = dashboardData?.learningProgress?.topics || [
@@ -217,11 +223,14 @@ export default function DashboardView({ dashboardData, onNavigate }) {
               </div>
             ) : (
               <div className="pt-1.5 pb-0.5">
-                <span className="text-xl sm:text-2xl font-bold text-slate-700 tracking-tight block">
-                  Readiness score not available yet
-                </span>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-4xl sm:text-5xl font-black text-slate-300 tracking-tight">
+                    --
+                  </span>
+                  <span className="text-lg sm:text-xl font-bold text-slate-300">/ 100</span>
+                </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Complete skill assessments and mock interviews to calculate your personalized readiness score.
+                  Complete skill assessments, resume ATS scan, and mock interviews to calculate your personalized readiness score.
                 </p>
               </div>
             )}
@@ -279,22 +288,31 @@ export default function DashboardView({ dashboardData, onNavigate }) {
         <div className="pt-5">
           <div className="flex items-center justify-between text-xs text-slate-600 mb-3 font-medium">
             <span className="font-semibold text-slate-700">7-Pillar Competency Breakdown:</span>
-            <span className="text-slate-400">Target threshold: 75%+</span>
+            <span className="text-slate-400">
+              {readinessReport?.coverageText ? `${readinessReport.coverageText} • Target: 75%+` : 'Target threshold: 75%+'}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             {readinessDimensions.map((dim) => (
               <div key={dim.label} className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-left">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-semibold text-slate-600 truncate">{dim.label}</span>
-                  <span className="text-xs font-bold text-slate-900">{dim.value}%</span>
+                  <span className="text-[11px] font-semibold text-slate-600 truncate" title={dim.label}>{dim.label}</span>
+                  <span className={`text-xs font-bold ${dim.available ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {dim.available ? `${dim.value}%` : '—'}
+                  </span>
                 </div>
                 <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                   <div 
-                    className={`h-full rounded-full transition-all duration-500 ${dim.value >= dim.target ? 'bg-indigo-600' : 'bg-amber-500'}`}
-                    style={{ width: `${dim.value}%` }}
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      !dim.available ? 'bg-transparent' : dim.value >= dim.target ? 'bg-indigo-600' : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${dim.available ? dim.value : 0}%` }}
                   />
                 </div>
+                {!dim.available && (
+                  <span className="text-[10px] text-slate-400 mt-1 block leading-tight">Not evaluated</span>
+                )}
               </div>
             ))}
           </div>

@@ -106,7 +106,7 @@ export default function TopNavbar({
           title="Click to view Placement Readiness Breakdown"
         >
           <span className={`w-1.5 h-1.5 rounded-full ${readinessScore !== null && readinessScore !== undefined ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-          <span>Readiness: <strong>{readinessScore !== null && readinessScore !== undefined ? `${readinessScore}%` : 'Pending'}</strong></span>
+          <span>Readiness: <strong>{readinessScore !== null && readinessScore !== undefined ? `${readinessScore}%` : 'In Progress'}</strong></span>
         </button>
 
         {/* Notifications Icon with Dropdown */}
