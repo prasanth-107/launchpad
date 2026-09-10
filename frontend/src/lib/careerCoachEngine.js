@@ -34,6 +34,7 @@ import {
   evaluateCandidateEligibility, 
   PLACEMENT_OPPORTUNITIES_CATALOG 
 } from './jobMatchingEngine.js';
+import { classifyOpportunityDeadline, computeOpportunityPriority } from './opportunityIntelligenceEngine.js';
 import { calculateApplicationStatistics, getUpcomingApplicationEvent } from './applicationPipelineEngine.js';
 
 // Canonical Quick Prompts
@@ -138,10 +139,21 @@ export function buildCareerCoachContext(candidateData = {}) {
   const evaluatedJobMatches = (opportunities || []).slice(0, 6).map(opp => {
     const match = computeJobMatchScore(candidateSkillsMap, opp);
     const eligibility = evaluateCandidateEligibility(candidateSkillsMap, opp);
+    const deadline = classifyOpportunityDeadline(opp.application_deadline);
+    const appRecord = applications.find(a => a.opportunity_id === opp.id || a.job_id === opp.id);
+    const priority = opp.priority || computeOpportunityPriority({
+      matchScore: match.matchScore,
+      eligibility,
+      deadline,
+      applicationStatus: appRecord ? appRecord.status : null,
+      isSaved: (candidateData.savedJobIds || []).includes(opp.id)
+    });
     return {
       opportunity: opp,
       matchScore: match.matchScore,
       eligibilityStatus: eligibility.status,
+      priority,
+      deadline,
       missingRequiredSkills: match.explanation?.missingSkills || []
     };
   }).sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
@@ -230,6 +242,8 @@ export function buildCareerCoachContext(candidateData = {}) {
         role: m.opportunity.role_title,
         matchScore: m.matchScore,
         eligibility: m.eligibilityStatus,
+        priority: m.priority || null,
+        deadline: m.deadline || null,
         missingSkills: m.missingRequiredSkills || []
       }))
     },
@@ -273,7 +287,7 @@ export function detectUserIntent(message = '') {
   if (m.includes('interview') || m.includes('mock') || m.includes('star')) {
     return 'interview_preparation';
   }
-  if (m.includes('job') || m.includes('opportunity') || m.includes('drive') || m.includes('fit') || m.includes('ready for')) {
+  if (m.includes('job') || m.includes('opportunity') || m.includes('drive') || m.includes('fit') || m.includes('ready for') || m.includes('apply') || m.includes('eligible') || m.includes('prioritize')) {
     return 'job_fit_matching';
   }
   if (m.includes('application') || m.includes('pipeline') || m.includes('attention') || m.includes('status') || m.includes('offer')) {
@@ -645,14 +659,18 @@ export function generateDeterministicCoachResponse(intent, context, originalMess
     }
 
     const missingText = topJob.missingSkills.length > 0 ? topJob.missingSkills.slice(0, 3).join(', ') : 'None detected';
+    const facts = [
+      `Top Matching Drive: ${topJob.company} — ${topJob.role}`,
+      `Calculated Match Score: ${topJob.matchScore}%`,
+      `Eligibility Status: ${topJob.eligibility === 'eligible' ? 'Academic criteria verified' : (topJob.eligibility === 'eligibility_unknown' ? 'Academic review needed' : 'Academic criteria not met')}`,
+      topJob.priority ? `Priority Tier: ${topJob.priority.label}` : null,
+      topJob.deadline ? `Application Deadline: ${topJob.deadline.label}` : null,
+      `Missing Drive Skills: ${missingText}`
+    ].filter(Boolean);
+
     return {
-      summary: `Based on your available profile and assessment evidence, your strongest current opportunity alignment is with ${topJob.company} (${topJob.role}) at a ${topJob.matchScore}% match score.`,
-      facts: [
-        `Top Matching Drive: ${topJob.company} — ${topJob.role}`,
-        `Calculated Match Score: ${topJob.matchScore}%`,
-        `Eligibility Verification: ${topJob.eligibility === 'eligible' ? 'Academic criteria verified' : 'Requires academic check'}`,
-        `Missing Drive Skills: ${missingText}`
-      ],
+      summary: `Based on your available profile and assessment evidence, your strongest current opportunity alignment is with ${topJob.company} (${topJob.role}) at a ${topJob.matchScore}% match score.${topJob.priority ? ` It is prioritized as "${topJob.priority.label}".` : ''}`,
+      facts,
       recommendations: [
         topJob.missingSkills.length > 0
           ? `Prepare missing skills (${missingText}) using recommended course modules before attending technical screening.`

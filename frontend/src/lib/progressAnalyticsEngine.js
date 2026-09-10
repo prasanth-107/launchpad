@@ -66,7 +66,8 @@ export function computeProgressOverview({
   userSkills = [],
   resumes = [],
   interviews = [],
-  applications = []
+  applications = [],
+  opportunities = []
 }) {
   // A. Learning Roadmap
   const totalMilestones = learningPaths.length;
@@ -102,6 +103,15 @@ export function computeProgressOverview({
 
   // G. Application Pipeline
   const activeApps = applications.filter(a => !['rejected', 'withdrawn', 'selected'].includes(a.status?.toLowerCase())).length;
+
+  // H. Placement Opportunities
+  const totalOpportunities = opportunities.length;
+  const eligibleCount = opportunities.filter(o => (o.eligibility?.status || o.eligibilityStatus) === 'eligible').length;
+  const highMatchCount = opportunities.filter(o => (o.matchScore || 0) >= 75).length;
+  const closingSoonCount = opportunities.filter(o => {
+    const u = o.deadline?.urgency;
+    return u === 'closing_today' || u === 'closing_tomorrow' || u === 'closing_soon';
+  }).length;
 
   return {
     readinessScore: readinessReport?.score ?? null,
@@ -142,6 +152,13 @@ export function computeProgressOverview({
       activeCount: activeApps,
       totalCount: applications.length,
       hasData: applications.length > 0
+    },
+    opportunities: {
+      totalCount: totalOpportunities,
+      eligibleCount,
+      highMatchCount,
+      closingSoonCount,
+      hasData: totalOpportunities > 0
     }
   };
 }
@@ -714,3 +731,43 @@ export function generateReadinessInsights({
     nextFocus
   };
 }
+
+/**
+ * 10. Placement Drive Opportunity Intelligence Analytics
+ * Aggregates intelligence metrics across evaluated opportunities.
+ */
+export function analyzePlacementDriveOpportunities(opportunities = []) {
+  if (!Array.isArray(opportunities) || opportunities.length === 0) {
+    return {
+      total: 0,
+      eligibleCount: 0,
+      highPriorityCount: 0,
+      highMatchCount: 0,
+      closingSoonCount: 0,
+      appliedCount: 0,
+      topRecommended: null,
+      hasData: false
+    };
+  }
+
+  const eligibleCount = opportunities.filter(o => (o.eligibility?.status || o.eligibilityStatus) === 'eligible').length;
+  const highPriorityCount = opportunities.filter(o => o.priority?.tier === 'high_priority').length;
+  const highMatchCount = opportunities.filter(o => (o.matchScore || 0) >= 75).length;
+  const closingSoonCount = opportunities.filter(o => {
+    const u = o.deadline?.urgency;
+    return u === 'closing_today' || u === 'closing_tomorrow' || u === 'closing_soon';
+  }).length;
+  const appliedCount = opportunities.filter(o => o.applicationStatus || o.isTracked).length;
+
+  return {
+    total: opportunities.length,
+    eligibleCount,
+    highPriorityCount,
+    highMatchCount,
+    closingSoonCount,
+    appliedCount,
+    topRecommended: opportunities[0] || null,
+    hasData: true
+  };
+}
+

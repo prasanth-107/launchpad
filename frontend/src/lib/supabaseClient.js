@@ -5,6 +5,7 @@
  * and a high-fidelity persistent adapter for offline evaluation.
  */
 import { createClient } from '@supabase/supabase-js';
+import { evaluateAllOpportunities, rankOpportunities } from './opportunityIntelligenceEngine.js';
 import {
   generateDailyPreparationPlan,
   determinePreparationMode,
@@ -1001,6 +1002,51 @@ export const dal = {
       const store = getLocalStore();
       const list = store.job_opportunities || PLACEMENT_OPPORTUNITIES_CATALOG;
       return list.find(j => j.id === id) || null;
+    },
+
+    async getIntelligenceData(userId) {
+      const [
+        catalog,
+        savedJobIds,
+        applications,
+        profile,
+        userSkills,
+        attempts,
+        latestResume,
+        interviews,
+        progress
+      ] = await Promise.all([
+        this.list(),
+        userId ? dal.savedJobs.list(userId) : Promise.resolve([]),
+        userId ? dal.applications.list(userId) : Promise.resolve([]),
+        userId ? dal.profiles.get(userId) : Promise.resolve(null),
+        userId ? dal.skills.getUserSkills(userId) : Promise.resolve([]),
+        userId ? dal.assessments.getAttempts(userId) : Promise.resolve([]),
+        userId ? dal.resumes.getLatest(userId) : Promise.resolve(null),
+        userId ? dal.interviews.list(userId) : Promise.resolve([]),
+        userId ? dal.courses.getProgress(userId) : Promise.resolve([])
+      ]);
+
+      const candidateContext = {
+        profile,
+        userSkills: userSkills || [],
+        attempts: attempts || [],
+        latestResume: latestResume || null,
+        interviews: interviews || [],
+        progress: progress || [],
+        savedJobIds: savedJobIds || [],
+        applications: applications || []
+      };
+
+      const evaluatedOpportunities = evaluateAllOpportunities(catalog, candidateContext);
+
+      return {
+        catalog,
+        candidateContext,
+        savedJobIds,
+        applications,
+        evaluatedOpportunities
+      };
     }
   },
 
@@ -1300,45 +1346,27 @@ export const dal = {
       existingLearningPaths: learningPaths
     });
 
-    // Phase 9 Placement Opportunities & Grounded Job Matching
+    // Phase 10 Application Tracking & Placement Pipeline Intelligence
+    const applications = await dal.applications.list(userId);
+    const pipelineStats = calculateApplicationStatistics(applications);
+    const upcomingApplicationEvent = getUpcomingApplicationEvent(applications);
+
+    // Phase 14 Placement Drive Intelligence & Smart Opportunity Discovery
     const catalog = await dal.opportunities.list();
+    const savedJobIds = await dal.savedJobs.list(userId);
     const candidateContext = {
       profile,
       userSkills,
       attempts,
       latestResume,
       interviews,
-      progress
+      progress,
+      savedJobIds,
+      applications
     };
-    const scoredOpportunities = catalog.map(opp => {
-      const match = computeJobMatchScore(candidateContext, opp);
-      const eligibility = evaluateCandidateEligibility({
-        department: profile?.department,
-        year: profile?.year,
-        cgpa: profile?.cgpa,
-        backlogs: profile?.backlogs
-      }, opp);
-      return {
-        ...opp,
-        matchScore: match.matchScore,
-        matchTier: match.tier,
-        matchTierVariant: match.tierVariant,
-        factorSummary: match.factorSummary,
-        eligibilityStatus: eligibility.status,
-        canApply: eligibility.canApply,
-        matchExplanation: match.explanation
-      };
-    });
-
-    const sortedOpportunities = [...scoredOpportunities].sort((a, b) => {
-      if (a.matchScore === null) return 1;
-      if (b.matchScore === null) return -1;
-      return b.matchScore - a.matchScore;
-    });
-    // Phase 10 Application Tracking & Placement Pipeline Intelligence
-    const applications = await dal.applications.list(userId);
-    const pipelineStats = calculateApplicationStatistics(applications);
-    const upcomingApplicationEvent = getUpcomingApplicationEvent(applications);
+    const evaluatedOpportunities = evaluateAllOpportunities(catalog, candidateContext);
+    const rankedOpportunities = rankOpportunities(evaluatedOpportunities, 'recommended', candidateContext);
+    const recommendedJobs = rankedOpportunities.slice(0, 3);
 
     return {
       profile,

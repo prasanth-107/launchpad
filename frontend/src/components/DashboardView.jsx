@@ -1136,9 +1136,9 @@ export default function DashboardView({ dashboardData, onNavigate }) {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-slate-900">RECOMMENDED FOR YOU</h3>
-                  <Badge variant="primary" size="xs">Phase 9 Match</Badge>
+                  <Badge variant="primary" size="xs">Phase 14 Intelligence</Badge>
                 </div>
-                <p className="text-xs text-slate-500">Top placement opportunities ranked by your real skills & verified readiness</p>
+                <p className="text-xs text-slate-500">Top placement opportunities ranked by your real skills, verified readiness & deadline urgency</p>
               </div>
               <button
                 onClick={() => onNavigate('job-opportunities')}
@@ -1166,6 +1166,11 @@ export default function DashboardView({ dashboardData, onNavigate }) {
               <div className="divide-y divide-slate-100 my-2">
                 {recommendedJobs.map((drive) => {
                   const hasMatch = drive.matchScore !== null && drive.matchScore !== undefined;
+                  const priority = drive.priority || null;
+                  const deadline = drive.deadline || null;
+                  const eligStatus = drive.eligibility?.status || drive.eligibilityStatus || 'eligibility_unknown';
+                  const isApplied = Boolean(drive.applicationStatus || drive.isTracked);
+
                   return (
                     <div key={drive.id || drive.company_name} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -1173,7 +1178,7 @@ export default function DashboardView({ dashboardData, onNavigate }) {
                           {drive.logo_letter || drive.company_name.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="text-xs font-bold text-slate-900">{drive.company_name}</span>
                             {hasMatch ? (
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
@@ -1188,18 +1193,38 @@ export default function DashboardView({ dashboardData, onNavigate }) {
                             ) : (
                               <Badge variant="neutral" size="xs">Campus Drive</Badge>
                             )}
+
+                            {priority && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${priority.bg} ${priority.color} ${priority.border}`}>
+                                {priority.label}
+                              </span>
+                            )}
+
                             <Badge 
                               variant={
-                                drive.eligibilityStatus === 'eligible' 
+                                eligStatus === 'eligible' 
                                   ? 'success' 
-                                  : drive.eligibilityStatus === 'eligibility_unknown' 
+                                  : eligStatus === 'eligibility_unknown' 
                                   ? 'warning' 
                                   : 'danger'
                               }
                               size="xs"
                             >
-                              {drive.eligibilityStatus === 'eligible' ? 'Eligible' : (drive.eligibilityStatus === 'eligibility_unknown' ? 'Review Needed' : 'Ineligible')}
+                              {eligStatus === 'eligible' ? 'Eligible' : (eligStatus === 'eligibility_unknown' ? 'Review Needed' : 'Ineligible')}
                             </Badge>
+
+                            {deadline && (
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${deadline.badgeBg} ${deadline.badgeColor} ${deadline.border}`}>
+                                <Clock className="w-2.5 h-2.5" />
+                                {deadline.label}
+                              </span>
+                            )}
+
+                            {isApplied && (
+                              <Badge variant="purple" size="xs">
+                                Applied
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-slate-600 font-medium mt-0.5">{drive.role_title}</p>
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
@@ -1217,7 +1242,7 @@ export default function DashboardView({ dashboardData, onNavigate }) {
                           onClick={() => onNavigate('job-opportunities')}
                           className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                         >
-                          View Match
+                          View Drive
                         </button>
                       </div>
                     </div>
