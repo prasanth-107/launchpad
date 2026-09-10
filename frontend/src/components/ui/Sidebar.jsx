@@ -21,7 +21,8 @@ import {
   GraduationCap,
   ChevronRight,
   Layers,
-  Bot
+  Bot,
+  Brain
 } from 'lucide-react';
 
 export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClose }) {
@@ -40,6 +41,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
     {
       title: 'LEARNING',
       items: [
+        { id: 'adaptive-practice', label: 'Adaptive Practice', icon: Brain },
         { id: 'roadmap', label: 'Learning Paths', icon: Compass },
         { id: 'courses', label: 'Courses', icon: BookOpen },
         { id: 'assessments', label: 'Assessments', icon: CheckSquare },

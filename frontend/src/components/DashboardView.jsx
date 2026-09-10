@@ -25,7 +25,8 @@ import {
   DollarSign,
   Layers,
   Bot,
-  BarChart3
+  BarChart3,
+  Brain
 } from 'lucide-react';
 import { generateDailyPreparationPlan } from '../lib/dailyPreparationEngine';
 import { compareInterviewHistory, INTERVIEW_TRENDS } from '../lib/interviewIntelligenceEngine';
@@ -443,6 +444,33 @@ export default function DashboardView({ dashboardData, onNavigate }) {
             Complete your initial assessment to generate your personalized preparation plan.
           </div>
         )}
+      </div>
+
+      {/* Phase 16 Adaptive Practice Quick Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-linear-to-r from-indigo-50/70 via-white to-purple-50/50 border border-indigo-100/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <Brain className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+                Adaptive Question Intelligence
+              </span>
+              <Badge variant="primary" size="xs">Phase 16</Badge>
+            </div>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Personalized practice questions calibrated dynamically to your skill gaps & target campus drives.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onNavigate('adaptive-practice')}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
+        >
+          <span>Practice Now</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* 2. Primary Metric Hero Card: PLACEMENT READINESS (7 Dimensions) */}

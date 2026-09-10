@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppShell } from './components/ui/AppShell';
 import DashboardView from './components/DashboardView';
 import PreparationWorkspaceView from './components/PreparationWorkspaceView';
+import AdaptivePracticeView from './components/AdaptivePracticeView';
 import AnalyticsView from './components/AnalyticsView';
 import OverallReportView from './components/OverallReportView';
 import PlacementReadinessView from './components/PlacementReadinessView';
@@ -24,6 +25,7 @@ import { dal } from './lib/supabaseClient';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [practiceOpportunity, setPracticeOpportunity] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
   const [notification, setNotification] = useState('');
@@ -38,7 +40,14 @@ export default function App() {
     setTimeout(() => setNotification(''), 4000);
   };
 
-  const handleNavigate = (tab) => setActiveTab(tab);
+  const handleNavigate = (tab, options = {}) => {
+    if (options?.practiceOpportunity) {
+      setPracticeOpportunity(options.practiceOpportunity);
+    } else if (tab !== 'adaptive-practice' && tab !== 'practice') {
+      setPracticeOpportunity(null);
+    }
+    setActiveTab(tab);
+  };
 
   // Load real database metrics from Supabase Data Access Layer
   const refreshDashboard = async (userId) => {
@@ -270,6 +279,14 @@ export default function App() {
       )}
 
       {/* View Routing */}
+      {(activeTab === 'adaptive-practice' || activeTab === 'practice') && (
+        <AdaptivePracticeView
+          user={user}
+          onNavigate={handleNavigate}
+          practiceOpportunity={practiceOpportunity}
+        />
+      )}
+
       {(activeTab === 'preparation' || activeTab === 'daily-plan') && (
         <PreparationWorkspaceView
           user={user}

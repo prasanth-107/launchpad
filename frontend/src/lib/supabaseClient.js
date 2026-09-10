@@ -1,3 +1,10 @@
+import {
+  selectAdaptiveQuestions,
+  computeNextAdaptiveDifficulty,
+  evaluateCandidateSkillPriorities,
+  generateAdaptivePracticeDailyActions,
+  VERIFIED_QUESTION_BANK
+} from './questionIntelligenceEngine.js';
 /**
  * Modern Placement Launchpad - Supabase Client & Data Access Layer (DAL)
  * Connects directly to Supabase PostgreSQL using VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.
@@ -87,6 +94,9 @@ function getLocalStore() {
       if (!parsed.coach_sessions) parsed.coach_sessions = [];
       if (!parsed.coach_messages) parsed.coach_messages = [];
       if (!parsed.readiness_snapshots) parsed.readiness_snapshots = [];
+      if (!parsed.preparation_actions) parsed.preparation_actions = [];
+      if (!parsed.adaptive_practice_sessions) parsed.adaptive_practice_sessions = [];
+      if (!parsed.adaptive_practice_attempts) parsed.adaptive_practice_attempts = [];
       return parsed;
     }
   } catch (e) {
@@ -211,7 +221,11 @@ function initDefaultStore() {
     // 15. readiness_snapshots (Entity 18 historical readiness audits)
     readiness_snapshots: [],
     // 16. preparation_actions (Entity 19 daily plan action tracking)
-    preparation_actions: []
+    preparation_actions: [],
+    // 17. adaptive_practice_sessions (Phase 16)
+    adaptive_practice_sessions: [],
+    // 18. adaptive_practice_attempts (Phase 16)
+    adaptive_practice_attempts: []
   };
 
   saveLocalStore(initialStore);
@@ -1921,6 +1935,9 @@ export const dal = {
         completedActions: todayActions
       };
 
+      const adaptiveActions = generateAdaptivePracticeDailyActions(null, candidateContext);
+      candidateContext.adaptivePracticeActions = adaptiveActions;
+
       const dailyPlan = generateDailyPreparationPlan(candidateContext);
       const streak = computePreparationStreak((completedActions || []).filter(a => a.completed));
       const weeklySummary = computeWeeklySummary({
@@ -1945,6 +1962,242 @@ export const dal = {
         courseProgress,
         attempts
       };
+    }
+  },
+
+  // 18. AI Placement Content & Adaptive Question Intelligence (Phase 16)
+  adaptivePractice: {
+    async getSessions(userId, limit = 20) {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('adaptive_practice_sessions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        if (!error && data) return data;
+      }
+      const store = getLocalStore();
+      const sessions = (store.adaptive_practice_sessions || [])
+        .filter(s => s.user_id === userId)
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      return sessions.slice(0, limit);
+    },
+
+    async getSession(sessionId) {
+      if (isSupabaseConfigured && supabase) {
+        const { data: session, error } = await supabase
+          .from('adaptive_practice_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single();
+        if (!error && session) {
+          const { data: attempts } = await supabase
+            .from('adaptive_practice_attempts')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('question_order', { ascending: true });
+          return { ...session, attempts: attempts || [] };
+        }
+      }
+      const store = getLocalStore();
+      const session = (store.adaptive_practice_sessions || []).find(s => s.id === sessionId);
+      if (!session) return null;
+      const attempts = (store.adaptive_practice_attempts || [])
+        .filter(a => a.session_id === sessionId)
+        .sort((a, b) => (a.question_order || 0) - (b.question_order || 0));
+      return { ...session, attempts };
+    },
+
+    async createSession(sessionData) {
+      const record = {
+        id: sessionData.id || `aps-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        user_id: sessionData.user_id,
+        skill: sessionData.skill || 'General',
+        topic: sessionData.topic || 'General Practice',
+        initial_difficulty: sessionData.initial_difficulty || 'Medium',
+        current_difficulty: sessionData.current_difficulty || sessionData.initial_difficulty || 'Medium',
+        total_questions: sessionData.total_questions || 0,
+        correct_count: sessionData.correct_count || 0,
+        accuracy_percentage: sessionData.accuracy_percentage || 0,
+        priority_tier: sessionData.priority_tier || 'P5',
+        priority_reason: sessionData.priority_reason || 'Standard campus placement practice drill.',
+        target_role: sessionData.target_role || null,
+        target_opportunity_id: sessionData.target_opportunity_id || null,
+        status: sessionData.status || 'in_progress',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('adaptive_practice_sessions')
+          .insert(record)
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
+
+      const store = getLocalStore();
+      if (!store.adaptive_practice_sessions) store.adaptive_practice_sessions = [];
+      store.adaptive_practice_sessions.unshift(record);
+      saveLocalStore(store);
+      return record;
+    },
+
+    async recordAttempt(attemptData) {
+      const record = {
+        id: attemptData.id || `apa-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        session_id: attemptData.session_id,
+        user_id: attemptData.user_id,
+        question_id: attemptData.question_id,
+        skill: attemptData.skill,
+        difficulty: attemptData.difficulty,
+        question_order: attemptData.question_order || 1,
+        selected_answer: attemptData.selected_answer,
+        correct_answer: attemptData.correct_answer,
+        is_correct: Boolean(attemptData.is_correct),
+        time_spent_seconds: attemptData.time_spent_seconds || 0,
+        difficulty_transition: attemptData.difficulty_transition || 'stable',
+        created_at: new Date().toISOString()
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('adaptive_practice_attempts').insert(record);
+        const { data: session } = await supabase.from('adaptive_practice_sessions').select('*').eq('id', record.session_id).single();
+        if (session) {
+          const total = (session.total_questions || 0) + 1;
+          const correct = (session.correct_count || 0) + (record.is_correct ? 1 : 0);
+          const accuracy = Math.round((correct / total) * 100);
+          await supabase.from('adaptive_practice_sessions').update({
+            total_questions: total,
+            correct_count: correct,
+            accuracy_percentage: accuracy,
+            current_difficulty: attemptData.next_difficulty || session.current_difficulty,
+            updated_at: new Date().toISOString()
+          }).eq('id', record.session_id);
+        }
+      }
+
+      const store = getLocalStore();
+      if (!store.adaptive_practice_attempts) store.adaptive_practice_attempts = [];
+      store.adaptive_practice_attempts.push(record);
+
+      const sIdx = (store.adaptive_practice_sessions || []).findIndex(s => s.id === record.session_id);
+      if (sIdx >= 0) {
+        const s = store.adaptive_practice_sessions[sIdx];
+        s.total_questions = (s.total_questions || 0) + 1;
+        s.correct_count = (s.correct_count || 0) + (record.is_correct ? 1 : 0);
+        s.accuracy_percentage = Math.round((s.correct_count / s.total_questions) * 100);
+        if (attemptData.next_difficulty) {
+          s.current_difficulty = attemptData.next_difficulty;
+        }
+        s.updated_at = new Date().toISOString();
+      }
+      saveLocalStore(store);
+      return record;
+    },
+
+    async completeSession(sessionId, finalStats = {}) {
+      const patch = {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...finalStats
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('adaptive_practice_sessions')
+          .update(patch)
+          .eq('id', sessionId)
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
+
+      const store = getLocalStore();
+      const sIdx = (store.adaptive_practice_sessions || []).findIndex(s => s.id === sessionId);
+      if (sIdx >= 0) {
+        store.adaptive_practice_sessions[sIdx] = {
+          ...store.adaptive_practice_sessions[sIdx],
+          ...patch
+        };
+        saveLocalStore(store);
+        return store.adaptive_practice_sessions[sIdx];
+      }
+      return null;
+    },
+
+    async getPracticeSummary(userId) {
+      const store = getLocalStore();
+      const sessions = (store.adaptive_practice_sessions || []).filter(s => s.user_id === userId);
+      const attempts = (store.adaptive_practice_attempts || []).filter(a => a.user_id === userId);
+
+      const totalQuestions = attempts.length;
+      const correctCount = attempts.filter(a => a.is_correct).length;
+      const overallAccuracy = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+
+      const skillsMap = {};
+      for (const a of attempts) {
+        if (!skillsMap[a.skill]) {
+          skillsMap[a.skill] = { total: 0, correct: 0 };
+        }
+        skillsMap[a.skill].total++;
+        if (a.is_correct) skillsMap[a.skill].correct++;
+      }
+
+      return {
+        totalSessions: sessions.length,
+        completedSessions: sessions.filter(s => s.status === 'completed').length,
+        totalQuestions,
+        correctCount,
+        overallAccuracy,
+        skillsPracticed: Object.keys(skillsMap).map(k => ({
+          skill: k,
+          total: skillsMap[k].total,
+          correct: skillsMap[k].correct,
+          accuracy: Math.round((skillsMap[k].correct / skillsMap[k].total) * 100)
+        }))
+      };
+    },
+
+    async getRecommendedQuestions(userId, options = {}) {
+      const [
+        profile,
+        userSkills,
+        attempts,
+        interviews,
+        resumes,
+        courseProgress
+      ] = await Promise.all([
+        dal.profiles.get(userId),
+        dal.user_skills.getByUser(userId),
+        dal.assessment_attempts.getByUser(userId),
+        dal.mock_interviews.getByUser(userId),
+        dal.resumes.getByUser(userId),
+        dal.course_progress.getByUser(userId)
+      ]);
+
+      const readinessReport = computePlacementReadiness({
+        attempts,
+        userSkills,
+        resumes,
+        interviews,
+        progress: courseProgress,
+        profile
+      });
+
+      const candidateContext = {
+        profile,
+        userSkills,
+        attempts,
+        interviews,
+        readinessReport,
+        targetRole: profile?.target_role || profile?.preferred_job_role || 'Software Engineer'
+      };
+
+      return selectAdaptiveQuestions(candidateContext, options);
     }
   }
 };

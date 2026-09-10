@@ -27,7 +27,8 @@ import {
   Target,
   FileText,
   Mic2,
-  CheckSquare
+  CheckSquare,
+  Brain
 } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { ProgressBar } from './ui/ProgressBar';
@@ -905,6 +906,20 @@ export default function JobOpportunitiesView({ user, onNavigate }) {
               >
                 <CheckSquare className="w-3.5 h-3.5" />
                 <span>Add to Preparation Plan</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const opp = selectedOpportunity;
+                  setSelectedOpportunity(null);
+                  if (onNavigate) {
+                    onNavigate('adaptive-practice', { practiceOpportunity: opp });
+                  }
+                }}
+                className="px-3.5 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Brain className="w-3.5 h-3.5" />
+                <span>Practice for this Drive</span>
               </button>
 
               <div className="flex items-center gap-2">

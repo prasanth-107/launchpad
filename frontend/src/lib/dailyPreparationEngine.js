@@ -480,6 +480,29 @@ export function generateDailyPreparationPlan(candidateData = {}) {
     });
   }
 
+  // Phase 16 Adaptive Practice Actions from Question Intelligence
+  if (Array.isArray(candidateData.adaptivePracticeActions) && candidateData.adaptivePracticeActions.length > 0) {
+    candidateData.adaptivePracticeActions.forEach(pAct => {
+      potentialActions.push({
+        id: pAct.id,
+        key: pAct.actionKey || pAct.id,
+        title: pAct.title,
+        category: 'Adaptive Practice',
+        priority: pAct.code || ACTION_PRIORITIES.P4.code,
+        priorityLabel: pAct.priority || ACTION_PRIORITIES.P4.label,
+        priorityVariant: pAct.variant === 'danger' ? ACTION_PRIORITIES.P1.variant : ACTION_PRIORITIES.P4.variant,
+        weight: pAct.code === 'P1' ? ACTION_PRIORITIES.P1.weight + 20 : ACTION_PRIORITIES.P4.weight + 20,
+        reason: pAct.description,
+        estimated_minutes: pAct.estimatedMinutes || 10,
+        destination: pAct.targetView || 'adaptive-practice',
+        actionLabel: 'Practice Now',
+        source: 'Adaptive Question Intelligence',
+        completed: completedKeys.has(pAct.actionKey || pAct.id),
+        metadata: { fromQuestionIntelligence: true, skill: pAct.skill, difficulty: pAct.difficulty }
+      });
+    });
+  }
+
   // Deduplicate by key
   const seenKeys = new Set();
   const uniqueActions = [];

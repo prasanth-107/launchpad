@@ -1,3 +1,4 @@
+import { selectAdaptiveQuestions } from './questionIntelligenceEngine.js';
 /**
  * careerCoachEngine.js
  * -----------------------------------------------------------------------------
@@ -40,6 +41,7 @@ import { buildFullInterviewIntelligence } from './interviewIntelligenceEngine.js
 
 // Canonical Quick Prompts
 export const QUICK_PROMPTS = [
+  { id: 'practice_next', label: 'What should I practice next?', prompt: 'What questions should I practice next to improve my placement readiness?' },
   { id: 'daily_action', label: 'What should I do today?', prompt: 'What should I prepare today based on my current placement data?' },
   { id: 'readiness_why', label: 'Why is my readiness score low?', prompt: 'Why is my readiness score low and how can I raise it?' },
   { id: 'skill_priority', label: 'What skill should I improve first?', prompt: 'Which skill should I improve first to maximize my placement readiness?' },
@@ -339,6 +341,9 @@ export function detectUserIntent(message = '') {
   }
   if (m.includes('application') || m.includes('pipeline') || m.includes('attention') || m.includes('status') || m.includes('offer')) {
     return 'application_pipeline';
+  }
+  if (m.includes('practice') || m.includes('question') || m.includes('what should i practice') || m.includes('questions will improve')) {
+    return 'adaptive_practice';
   }
   if (m.includes('today') || m.includes('what should i do') || m.includes('start') || m.includes('next action')) {
     return 'daily_action';
@@ -892,7 +897,41 @@ export function generateDeterministicCoachResponse(intent, context, originalMess
     };
   }
 
-  // 9. DAILY ACTION / GENERAL GUIDANCE (Default Fallback)
+  // 9. ADAPTIVE PRACTICE (Phase 16)
+  if (intent === 'adaptive_practice') {
+    const rawCandidate = {
+      userSkills: (skillGaps.allGaps || []).map(g => ({ skill_name: g.name, score: g.score })),
+      attempts: [],
+      interviews: mockInterview.hasInterview ? [{ overall_score: mockInterview.overallScore }] : [],
+      readinessReport: {
+        pillars: readiness.pillars || []
+      },
+      targetRole: candidate.targetRole || candidate.preferredRole || 'Software Engineer'
+    };
+
+    const recommended = selectAdaptiveQuestions(rawCandidate, { limit: 3 });
+    const topQ = recommended[0];
+
+    return {
+      summary: topQ
+        ? `Based on your placement records, your highest-leverage practice priority is ${topQ.skill} (${topQ.difficulty} difficulty). Practicing these targeted questions will directly elevate your ${topQ.priorityTier} readiness.`
+        : 'Explore adaptive practice questions tailored to your target placement role and core competencies.',
+      facts: recommended.map(q => `Practice Question [${q.skill} · ${q.difficulty}]: "${q.prompt.slice(0, 70)}..." (${q.priorityTier} — ${q.priorityReason})`),
+      recommendations: [
+        topQ ? `Practice 5 adaptive ${topQ.skill} questions in the Adaptive Practice console.` : 'Complete diagnostic drills to benchmark your problem solving.',
+        'Adaptive practice dynamically steps up in difficulty when you answer 2 consecutive questions correctly.',
+        'Review pedagogical answer explanations after each question to reinforce underlying placement concepts.'
+      ],
+      next_action: {
+        label: `Practice ${topQ ? topQ.skill : 'Adaptive Questions'}`,
+        route: 'adaptive-practice'
+      },
+      sources: ['Adaptive Question Intelligence', SOURCE_LABELS.SKILL_GAP],
+      disclaimer
+    };
+  }
+
+  // 10. DAILY ACTION / GENERAL GUIDANCE (Default Fallback)
   const priorityGap = readiness.priorityGap || skillGaps.criticalGaps[0] || skillGaps.skillsToImprove[0];
   const priorityName = priorityGap ? (priorityGap.name || 'Core CS') : 'Data Structures';
   const targetRoute = priorityGap?.actionTarget || (skillGaps.totalAssessed === 0 ? 'assessments' : 'roadmap');
