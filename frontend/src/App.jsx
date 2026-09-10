@@ -343,7 +343,10 @@ export default function App() {
       )}
 
       {activeTab === 'job-opportunities' && (
-        <JobOpportunitiesView />
+        <JobOpportunitiesView 
+          user={user}
+          onNavigate={handleNavigate}
+        />
       )}
 
       {(activeTab === 'skills' || activeTab === 'certificates' || activeTab === 'skill-gap') && (

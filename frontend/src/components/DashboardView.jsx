@@ -182,36 +182,8 @@ export default function DashboardView({ dashboardData, onNavigate }) {
     }
   ];
 
-  // Placement Opportunities preview
-  const placementOpportunities = [
-    {
-      company: 'Google',
-      role: 'Software Engineer - Early Career',
-      package: '₹28 - 34 LPA',
-      deadline: 'Sep 25, 2026',
-      eligibility: '7.5+ CGPA • 2026 Batch',
-      logo: 'G',
-      url: 'https://careers.google.com/students/'
-    },
-    {
-      company: 'Microsoft',
-      role: 'Software Development Engineer - SDE-1',
-      package: '₹26 - 32 LPA',
-      deadline: 'Oct 02, 2026',
-      eligibility: '7.0+ CGPA • All Eng Branches',
-      logo: 'M',
-      url: 'https://careers.microsoft.com/students/us/en'
-    },
-    {
-      company: 'Amazon',
-      role: 'Software Development Engineer - 2026',
-      package: '₹24 - 30 LPA',
-      deadline: 'Oct 10, 2026',
-      eligibility: 'CSE/IT/Circuital • No backlogs',
-      logo: 'A',
-      url: 'https://www.amazon.jobs/en/business_categories/university-tech'
-    }
-  ];
+  // Real Grounded Placement Opportunities (Phase 9 Job Matching Engine)
+  const recommendedJobs = dashboardData?.recommendedJobs || [];
 
   // Recent Activity timeline (strictly reflects actual user submissions)
   const recentActivities = dashboardData?.recentActivities || [
@@ -865,64 +837,112 @@ export default function DashboardView({ dashboardData, onNavigate }) {
       {/* 6. Third 2-Column Grid: Placement Opportunities & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Placement Opportunities Preview (7 Cols) */}
-        <div className="lg:col-span-7 saas-card p-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">Campus Placement Drives</h3>
-              <p className="text-xs text-slate-500">Active campus recruitment drives matching your profile</p>
+        {/* RECOMMENDED FOR YOU (Placement Opportunities - Phase 9) (7 Cols) */}
+        <div className="lg:col-span-7 saas-card p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900">RECOMMENDED FOR YOU</h3>
+                  <Badge variant="primary" size="xs">Phase 9 Match</Badge>
+                </div>
+                <p className="text-xs text-slate-500">Top placement opportunities ranked by your real skills & verified readiness</p>
+              </div>
+              <button
+                onClick={() => onNavigate('job-opportunities')}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>View All Drives</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
             </div>
-            <button
-              onClick={() => onNavigate('job-opportunities')}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1 cursor-pointer"
-            >
-              <span>View All Drives</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+
+            {recommendedJobs.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <p className="text-xs font-semibold text-slate-700">No placement opportunities available yet.</p>
+                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                  Complete your profile and assessments to improve job matching and receive tailored drive recommendations.
+                </p>
+                <button
+                  onClick={() => onNavigate('assessments')}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold mt-2 cursor-pointer"
+                >
+                  Take First Assessment
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 my-2">
+                {recommendedJobs.map((drive) => {
+                  const hasMatch = drive.matchScore !== null && drive.matchScore !== undefined;
+                  return (
+                    <div key={drive.id || drive.company_name} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-sm flex items-center justify-center shrink-0 shadow-2xs">
+                          {drive.logo_letter || drive.company_name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">{drive.company_name}</span>
+                            {hasMatch ? (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                drive.matchScore >= 75 
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : drive.matchScore >= 50
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {drive.matchScore}% Match
+                              </span>
+                            ) : (
+                              <Badge variant="neutral" size="xs">Campus Drive</Badge>
+                            )}
+                            <Badge 
+                              variant={
+                                drive.eligibilityStatus === 'eligible' 
+                                  ? 'success' 
+                                  : drive.eligibilityStatus === 'eligibility_unknown' 
+                                  ? 'warning' 
+                                  : 'danger'
+                              }
+                              size="xs"
+                            >
+                              {drive.eligibilityStatus === 'eligible' ? 'Eligible' : (drive.eligibilityStatus === 'eligibility_unknown' ? 'Review Needed' : 'Ineligible')}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-600 font-medium mt-0.5">{drive.role_title}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
+                            <span className="font-semibold text-emerald-700">{drive.package}</span>
+                            <span>•</span>
+                            <span>{drive.work_mode}</span>
+                            <span>•</span>
+                            <span>{drive.location}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => onNavigate('job-opportunities')}
+                          className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                        >
+                          View Match
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="divide-y divide-slate-100 my-2">
-            {placementOpportunities.map((drive) => (
-              <div key={drive.company} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-2xs">
-                    {drive.logo}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900">{drive.company}</span>
-                      <Badge variant="neutral" size="xs">Campus Drive</Badge>
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium mt-0.5">{drive.role}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 mt-1">
-                      <span className="font-semibold text-emerald-700">{drive.package}</span>
-                      <span>•</span>
-                      <span>{drive.eligibility}</span>
-                      <span>•</span>
-                      <span>Closes: {drive.deadline}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <a
-                    href={drive.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-2xs transition-colors"
-                  >
-                    <span>Drive Portal</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <button
-                    onClick={() => onNavigate('job-opportunities')}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Match scores dynamically scale with verified test results and resume updates.</span>
+            <button
+              onClick={() => onNavigate('job-opportunities')}
+              className="text-indigo-600 font-semibold hover:underline cursor-pointer"
+            >
+              Explore all drives →
+            </button>
           </div>
         </div>
 

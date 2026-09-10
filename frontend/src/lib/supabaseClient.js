@@ -8,6 +8,11 @@ import { createClient } from '@supabase/supabase-js';
 import { computeSkillGaps } from './skillGapEngine';
 import { computePlacementReadiness } from './placementReadinessEngine';
 import { generatePersonalizedLearningPath } from './learningPathEngine';
+import { 
+  PLACEMENT_OPPORTUNITIES_CATALOG, 
+  computeJobMatchScore, 
+  evaluateCandidateEligibility 
+} from './jobMatchingEngine.js';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -41,7 +46,15 @@ const STORAGE_KEY = 'placement_launchpad_supabase_store_v1';
 function getLocalStore() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.job_opportunities || parsed.job_opportunities.length === 0) {
+        parsed.job_opportunities = PLACEMENT_OPPORTUNITIES_CATALOG;
+      }
+      if (!parsed.saved_jobs) parsed.saved_jobs = [];
+      if (!parsed.tracked_applications) parsed.tracked_applications = [];
+      return parsed;
+    }
   } catch (e) {
     console.warn('Could not read from localStorage:', e);
   }
@@ -154,7 +167,13 @@ function initDefaultStore() {
         verification_url: 'https://launchpad.placement.edu/verify/MPL-2026-CERT-3819',
         grade: 'Distinction'
       }
-    ]
+    ],
+    // 12. job_opportunities (curated campus recruitment drives)
+    job_opportunities: PLACEMENT_OPPORTUNITIES_CATALOG,
+    // 13. saved_jobs (user-scoped saved placement drives)
+    saved_jobs: [],
+    // 14. tracked_applications (user-scoped application tracking clicks)
+    tracked_applications: []
   };
 
   saveLocalStore(initialStore);
@@ -936,6 +955,94 @@ export const dal = {
     }
   },
 
+  // 10. Placement Opportunities (Entity 15)
+  opportunities: {
+    async list() {
+      const store = getLocalStore();
+      return store.job_opportunities || PLACEMENT_OPPORTUNITIES_CATALOG;
+    },
+
+    async get(id) {
+      const store = getLocalStore();
+      const list = store.job_opportunities || PLACEMENT_OPPORTUNITIES_CATALOG;
+      return list.find(j => j.id === id) || null;
+    }
+  },
+
+  // 11. Saved Jobs (Entity 16 - User-Scoped with RLS Isolation)
+  savedJobs: {
+    async list(userId) {
+      if (!userId) return [];
+      const store = getLocalStore();
+      const userSaved = (store.saved_jobs || []).filter(s => s.user_id === userId);
+      return userSaved.map(s => s.job_id);
+    },
+
+    async toggle(userId, jobId) {
+      if (!userId) throw new Error('User ID is required to save job');
+      const store = getLocalStore();
+      if (!store.saved_jobs) store.saved_jobs = [];
+
+      const existingIndex = store.saved_jobs.findIndex(s => s.user_id === userId && s.job_id === jobId);
+      let isSaved = false;
+
+      if (existingIndex >= 0) {
+        store.saved_jobs.splice(existingIndex, 1);
+        isSaved = false;
+      } else {
+        store.saved_jobs.push({
+          id: 'save-' + Date.now(),
+          user_id: userId,
+          job_id: jobId,
+          created_at: new Date().toISOString()
+        });
+        isSaved = true;
+      }
+
+      saveLocalStore(store);
+      return { isSaved, savedJobIds: store.saved_jobs.filter(s => s.user_id === userId).map(s => s.job_id) };
+    },
+
+    async isSaved(userId, jobId) {
+      if (!userId) return false;
+      const store = getLocalStore();
+      return (store.saved_jobs || []).some(s => s.user_id === userId && s.job_id === jobId);
+    }
+  },
+
+  // 12. Application Tracking (Entity 17 - Lightweight tracking)
+  applications: {
+    async list(userId) {
+      if (!userId) return [];
+      const store = getLocalStore();
+      return (store.tracked_applications || []).filter(a => a.user_id === userId);
+    },
+
+    async track(userId, jobId, details = {}) {
+      if (!userId) return null;
+      const store = getLocalStore();
+      if (!store.tracked_applications) store.tracked_applications = [];
+
+      const record = {
+        id: 'app-' + Date.now(),
+        user_id: userId,
+        job_id: jobId,
+        application_url: details.application_url || '',
+        company_name: details.company_name || '',
+        role_title: details.role_title || '',
+        status: 'applied_external',
+        applied_at: new Date().toISOString()
+      };
+
+      const existing = store.tracked_applications.find(a => a.user_id === userId && a.job_id === jobId);
+      if (!existing) {
+        store.tracked_applications.unshift(record);
+        saveLocalStore(store);
+      }
+      return existing || record;
+    }
+  },
+
   // 10. Real Database Dashboard Aggregator
   // Replaces dummy hardcoded stats with dynamic queries from real tables:
   // - Tests Completed → assessment_attempts
@@ -1002,6 +1109,43 @@ export const dal = {
       existingLearningPaths: learningPaths
     });
 
+    // Phase 9 Placement Opportunities & Grounded Job Matching
+    const catalog = await dal.opportunities.list();
+    const candidateContext = {
+      profile,
+      userSkills,
+      attempts,
+      latestResume,
+      interviews,
+      progress
+    };
+    const scoredOpportunities = catalog.map(opp => {
+      const match = computeJobMatchScore(candidateContext, opp);
+      const eligibility = evaluateCandidateEligibility({
+        department: profile?.department,
+        year: profile?.year,
+        cgpa: profile?.cgpa,
+        backlogs: profile?.backlogs
+      }, opp);
+      return {
+        ...opp,
+        matchScore: match.matchScore,
+        matchTier: match.tier,
+        matchTierVariant: match.tierVariant,
+        factorSummary: match.factorSummary,
+        eligibilityStatus: eligibility.status,
+        canApply: eligibility.canApply,
+        matchExplanation: match.explanation
+      };
+    });
+
+    const sortedOpportunities = [...scoredOpportunities].sort((a, b) => {
+      if (a.matchScore === null) return 1;
+      if (b.matchScore === null) return -1;
+      return b.matchScore - a.matchScore;
+    });
+    const recommendedJobs = sortedOpportunities.slice(0, 3);
+
     return {
       profile,
       placementReadiness,
@@ -1013,6 +1157,8 @@ export const dal = {
       interviews,
       mock_interviews: interviews,
       latestInterview: interviews[0] || null,
+      recommendedJobs,
+      jobOpportunities: scoredOpportunities,
       stats: {
         testsCompleted: testsCompleted.toString(),
         questionsAttempted: questionsAttempted.toString(),
