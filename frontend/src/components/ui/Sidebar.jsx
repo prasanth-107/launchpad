@@ -18,7 +18,8 @@ import {
   Settings, 
   LogOut,
   GraduationCap,
-  ChevronRight
+  ChevronRight,
+  Layers
 } from 'lucide-react';
 
 export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClose }) {
@@ -54,6 +55,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
       items: [
         { id: 'resume', label: 'Resume / ATS Score', icon: FileText },
         { id: 'job-opportunities', label: 'Placement Drives & Jobs', icon: Briefcase },
+        { id: 'applications', label: 'Application Pipeline', icon: Layers },
         { id: 'skills', label: 'Skills & Endorsements', icon: Sparkles },
         { id: 'certificates', label: 'Certificates', icon: Award },
       ]

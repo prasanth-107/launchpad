@@ -35,6 +35,7 @@ import {
   getJobPreparationRecommendations,
   getDeadlineStatus
 } from '../lib/jobMatchingEngine';
+import { STATUS_METADATA } from '../lib/applicationPipelineEngine';
 
 export default function JobOpportunitiesView({ user, onNavigate }) {
   // Navigation tabs: 'all' | 'saved'
@@ -137,12 +138,18 @@ export default function JobOpportunitiesView({ user, onNavigate }) {
 
     // Record tracking event without faking external status
     if (user?.id) {
-      dal.applications.track(user.id, opp.id, {
+      dal.applications.create(user.id, {
+        opportunity_id: opp.id,
+        job_id: opp.id,
         application_url: opp.application_url,
         company_name: opp.company_name,
-        role_title: opp.role_title
-      }).then(() => {
-        setTrackedApplications(prev => [...prev.filter(a => a.job_id !== opp.id), { job_id: opp.id }]);
+        role_title: opp.role_title,
+        status: 'applied'
+      }).then((newApp) => {
+        setTrackedApplications(prev => [
+          ...prev.filter(a => (a.opportunity_id !== opp.id && a.job_id !== opp.id)),
+          newApp || { opportunity_id: opp.id, job_id: opp.id, status: 'applied' }
+        ]);
       }).catch(err => console.warn('Could not log application tracking:', err));
     }
 
@@ -166,7 +173,9 @@ export default function JobOpportunitiesView({ user, onNavigate }) {
       }, opp);
       const deadline = getDeadlineStatus(opp.application_deadline);
       const isSaved = savedJobIds.includes(opp.id);
-      const isTracked = trackedApplications.some(a => a.job_id === opp.id);
+      const application = trackedApplications.find(a => (a.opportunity_id === opp.id || a.job_id === opp.id));
+      const isTracked = Boolean(application);
+      const applicationStatus = application?.status || null;
 
       return {
         ...opp,
@@ -179,7 +188,8 @@ export default function JobOpportunitiesView({ user, onNavigate }) {
         eligibility,
         deadline,
         isSaved,
-        isTracked
+        isTracked,
+        applicationStatus
       };
     });
   }, [candidateContext, savedJobIds, trackedApplications]);
@@ -459,19 +469,35 @@ export default function JobOpportunitiesView({ user, onNavigate }) {
                       </div>
                     </div>
 
-                    {/* Bookmark Toggle */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleSave(e, opp.id)}
-                      title={opp.isSaved ? 'Remove from saved' : 'Save opportunity'}
-                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                        opp.isSaved
-                          ? 'bg-amber-50 border-amber-200 text-amber-600'
-                          : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300'
-                      }`}
-                    >
-                      {opp.isSaved ? <BookmarkCheck className="w-4 h-4 fill-amber-500" /> : <Bookmark className="w-4 h-4" />}
-                    </button>
+                    {/* Status Pill & Bookmark Toggle */}
+                    <div className="flex items-center gap-2">
+                      {opp.applicationStatus && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                          opp.applicationStatus === 'selected' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                          opp.applicationStatus === 'offer' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          opp.applicationStatus === 'interview' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                          opp.applicationStatus === 'assessment' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                          opp.applicationStatus === 'rejected' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                          opp.applicationStatus === 'withdrawn' ? 'bg-slate-100 text-slate-600 border border-slate-200' :
+                          'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                        }`}>
+                          {STATUS_METADATA[opp.applicationStatus]?.label || 'In Pipeline'}
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleSave(e, opp.id)}
+                        title={opp.isSaved ? 'Remove from saved' : 'Save opportunity'}
+                        className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                          opp.isSaved
+                            ? 'bg-amber-50 border-amber-200 text-amber-600'
+                            : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        {opp.isSaved ? <BookmarkCheck className="w-4 h-4 fill-amber-500" /> : <Bookmark className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Metadata Row: Location, Work Mode, Package */}
@@ -810,14 +836,28 @@ export default function JobOpportunitiesView({ user, onNavigate }) {
                   Close
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleApply(selectedOpportunity)}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                >
-                  <span>Apply on Official Portal</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </button>
+                {selectedOpportunity.applicationStatus && selectedOpportunity.applicationStatus !== 'withdrawn' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedOpportunity(null);
+                      if (onNavigate) onNavigate('applications');
+                    }}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span>Track in Pipeline ({STATUS_METADATA[selectedOpportunity.applicationStatus]?.label || 'Applied'})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleApply(selectedOpportunity)}
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <span>{selectedOpportunity.applicationStatus === 'withdrawn' ? 'Re-apply on Official Portal' : 'Apply on Official Portal'}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 

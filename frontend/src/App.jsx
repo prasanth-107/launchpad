@@ -11,6 +11,7 @@ import LearningResourcesView from './components/LearningResourcesView';
 import MockInterviewView from './components/MockInterviewView';
 import ResumeAnalysisView from './components/ResumeAnalysisView';
 import JobOpportunitiesView from './components/JobOpportunitiesView';
+import ApplicationTrackingView from './components/ApplicationTrackingView';
 import SkillsCertificatesView from './components/SkillsCertificatesView';
 import ProfileSettingsView from './components/ProfileSettingsView';
 import AuthView from './components/AuthView';
@@ -33,6 +34,8 @@ export default function App() {
     setNotification(msg);
     setTimeout(() => setNotification(''), 4000);
   };
+
+  const handleNavigate = (tab) => setActiveTab(tab);
 
   // Load real database metrics from Supabase Data Access Layer
   const refreshDashboard = async (userId) => {
@@ -346,6 +349,14 @@ export default function App() {
         <JobOpportunitiesView 
           user={user}
           onNavigate={handleNavigate}
+        />
+      )}
+
+      {activeTab === 'applications' && (
+        <ApplicationTrackingView 
+          user={user}
+          onNavigate={handleNavigate}
+          onApplicationUpdated={() => refreshDashboard(user?.id)}
         />
       )}
 

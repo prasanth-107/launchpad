@@ -13,6 +13,13 @@ import {
   computeJobMatchScore, 
   evaluateCandidateEligibility 
 } from './jobMatchingEngine.js';
+import { 
+  APPLICATION_STATUSES,
+  isValidStatusTransition,
+  computeNextAction,
+  calculateApplicationStatistics,
+  getUpcomingApplicationEvent
+} from './applicationPipelineEngine.js';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -53,6 +60,7 @@ function getLocalStore() {
       }
       if (!parsed.saved_jobs) parsed.saved_jobs = [];
       if (!parsed.tracked_applications) parsed.tracked_applications = [];
+      if (!parsed.applications) parsed.applications = parsed.tracked_applications || [];
       return parsed;
     }
   } catch (e) {
@@ -1010,36 +1018,192 @@ export const dal = {
     }
   },
 
-  // 12. Application Tracking (Entity 17 - Lightweight tracking)
+  // 12. Application Tracking (Entity 15 - Canonical Placement Pipeline)
   applications: {
     async list(userId) {
       if (!userId) return [];
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('applications')
+            .select('*')
+            .eq('user_id', userId)
+            .order('updated_at', { ascending: false });
+          if (!error && data) return data;
+        } catch (e) {
+          console.warn('Supabase applications list note:', e);
+        }
+      }
       const store = getLocalStore();
-      return (store.tracked_applications || []).filter(a => a.user_id === userId);
+      const list = store.applications || store.tracked_applications || [];
+      return list.filter(a => a.user_id === userId);
     },
 
-    async track(userId, jobId, details = {}) {
-      if (!userId) return null;
-      const store = getLocalStore();
-      if (!store.tracked_applications) store.tracked_applications = [];
+    async get(userId, id) {
+      if (!userId || !id) return null;
+      const apps = await dal.applications.list(userId);
+      return apps.find(a => a.id === id || a.opportunity_id === id || a.job_id === id) || null;
+    },
 
-      const record = {
-        id: 'app-' + Date.now(),
+    async create(userId, oppData) {
+      if (!userId) throw new Error('User ID is required to create application');
+      const oppId = oppData.opportunity_id || oppData.id || oppData.job_id;
+      if (!oppId) throw new Error('Opportunity ID is required');
+
+      // 1. Duplicate Application Protection: Check if already exists
+      const existingApps = await dal.applications.list(userId);
+      const existing = existingApps.find(a => (a.opportunity_id === oppId || a.job_id === oppId));
+      if (existing) {
+        // If withdrawn, allow re-applying by updating status
+        if (existing.status === APPLICATION_STATUSES.WITHDRAWN) {
+          return await dal.applications.updateStatus(userId, existing.id, APPLICATION_STATUSES.APPLIED, {
+            updated_at: new Date().toISOString()
+          });
+        }
+        return { ...existing, alreadyTracked: true };
+      }
+
+      const initialStatus = oppData.status || APPLICATION_STATUSES.APPLIED;
+      const payload = {
         user_id: userId,
-        job_id: jobId,
-        application_url: details.application_url || '',
-        company_name: details.company_name || '',
-        role_title: details.role_title || '',
-        status: 'applied_external',
-        applied_at: new Date().toISOString()
+        opportunity_id: oppId,
+        job_id: oppId,
+        company_name: oppData.company_name || 'Placement Company',
+        role_title: oppData.role_title || 'Software Engineer',
+        status: initialStatus,
+        applied_at: oppData.applied_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        notes: oppData.notes || '',
+        next_action: oppData.next_action || null,
+        next_action_date: oppData.next_action_date || null,
+        assessment_date: oppData.assessment_date || null,
+        interview_date: oppData.interview_date || null,
+        offer_date: oppData.offer_date || null,
+        rejection_date: oppData.rejection_date || null,
+        application_url: oppData.application_url || ''
       };
 
-      const existing = store.tracked_applications.find(a => a.user_id === userId && a.job_id === jobId);
-      if (!existing) {
-        store.tracked_applications.unshift(record);
-        saveLocalStore(store);
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('applications')
+            .insert(payload)
+            .select()
+            .single();
+          if (!error && data) return data;
+        } catch (e) {
+          console.warn('Supabase application insert note:', e);
+        }
       }
-      return existing || record;
+
+      const store = getLocalStore();
+      const localRecord = {
+        id: 'app-' + Date.now(),
+        ...payload
+      };
+      if (!store.applications) store.applications = [];
+      if (!store.tracked_applications) store.tracked_applications = [];
+      store.applications.unshift(localRecord);
+      store.tracked_applications.unshift(localRecord);
+      saveLocalStore(store);
+      return localRecord;
+    },
+
+    // Backwards-compatible alias for Phase 9 external apply tracking
+    async track(userId, jobId, details = {}) {
+      return await dal.applications.create(userId, {
+        opportunity_id: jobId,
+        job_id: jobId,
+        ...details
+      });
+    },
+
+    async updateStatus(userId, applicationId, newStatus, extraFields = {}) {
+      if (!userId || !applicationId) return null;
+      const apps = await dal.applications.list(userId);
+      const app = apps.find(a => a.id === applicationId || a.opportunity_id === applicationId || a.job_id === applicationId);
+      if (!app) return null;
+
+      // Validate transition if newStatus is provided
+      if (newStatus && !isValidStatusTransition(app.status, newStatus)) {
+        console.warn(`Invalid transition from ${app.status} to ${newStatus}`);
+        return { error: `Cannot transition from ${app.status} to ${newStatus}`, application: app };
+      }
+
+      const updates = {
+        updated_at: new Date().toISOString(),
+        ...extraFields
+      };
+      if (newStatus) {
+        updates.status = newStatus;
+      }
+
+      if (newStatus === APPLICATION_STATUSES.REJECTED && !updates.rejection_date) {
+        updates.rejection_date = new Date().toISOString();
+      }
+      if (newStatus === APPLICATION_STATUSES.SELECTED && !updates.offer_date) {
+        updates.offer_date = new Date().toISOString();
+      }
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('applications')
+            .update(updates)
+            .eq('id', app.id)
+            .eq('user_id', userId)
+            .select()
+            .single();
+          if (!error && data) return data;
+        } catch (e) {
+          console.warn('Supabase updateStatus note:', e);
+        }
+      }
+
+      const store = getLocalStore();
+      const updateList = (list) => {
+        if (!list) return;
+        const idx = list.findIndex(a => (a.id === app.id || a.opportunity_id === app.opportunity_id || a.job_id === app.job_id) && a.user_id === userId);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], ...updates };
+        }
+      };
+      updateList(store.applications);
+      updateList(store.tracked_applications);
+      saveLocalStore(store);
+      return { ...app, ...updates };
+    },
+
+    async updateNotes(userId, applicationId, notes) {
+      return await dal.applications.updateStatus(userId, applicationId, null, { notes });
+    },
+
+    async updateDates(userId, applicationId, dates = {}) {
+      return await dal.applications.updateStatus(userId, applicationId, null, dates);
+    },
+
+    async withdraw(userId, applicationId) {
+      return await dal.applications.updateStatus(userId, applicationId, APPLICATION_STATUSES.WITHDRAWN);
+    },
+
+    async reapply(userId, applicationId) {
+      return await dal.applications.updateStatus(userId, applicationId, APPLICATION_STATUSES.APPLIED);
+    },
+
+    async isApplied(userId, opportunityId) {
+      if (!userId || !opportunityId) return { isApplied: false, status: null, application: null };
+      const apps = await dal.applications.list(userId);
+      const matched = apps.find(a => (a.opportunity_id === opportunityId || a.job_id === opportunityId) && a.status !== APPLICATION_STATUSES.WITHDRAWN);
+      return {
+        isApplied: Boolean(matched),
+        status: matched ? matched.status : null,
+        application: matched || null
+      };
+    },
+
+    async getPipelineStats(userId) {
+      const apps = await dal.applications.list(userId);
+      return calculateApplicationStatistics(apps);
     }
   },
 
@@ -1144,7 +1308,10 @@ export const dal = {
       if (b.matchScore === null) return -1;
       return b.matchScore - a.matchScore;
     });
-    const recommendedJobs = sortedOpportunities.slice(0, 3);
+    // Phase 10 Application Tracking & Placement Pipeline Intelligence
+    const applications = await dal.applications.list(userId);
+    const pipelineStats = calculateApplicationStatistics(applications);
+    const upcomingApplicationEvent = getUpcomingApplicationEvent(applications);
 
     return {
       profile,
@@ -1159,6 +1326,14 @@ export const dal = {
       latestInterview: interviews[0] || null,
       recommendedJobs,
       jobOpportunities: scoredOpportunities,
+      applications,
+      pipelineStats,
+      upcomingApplicationEvent,
+      activeApplicationsCount: pipelineStats.activeCount,
+      interviewPipelineCount: pipelineStats.interviewCount,
+      offerPipelineCount: pipelineStats.offerCount,
+      selectedPipelineCount: pipelineStats.selectedCount,
+      recentApplication: applications[0] || null,
       stats: {
         testsCompleted: testsCompleted.toString(),
         questionsAttempted: questionsAttempted.toString(),

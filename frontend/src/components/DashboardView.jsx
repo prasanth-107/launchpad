@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   Building2,
   MapPin,
-  DollarSign
+  DollarSign,
+  Layers
 } from 'lucide-react';
 import { StatCard } from './ui/StatCard';
 import { ProgressBar } from './ui/ProgressBar';
@@ -88,6 +89,17 @@ export default function DashboardView({ dashboardData, onNavigate }) {
   if (hasInterview) {
     interviewFeedback = latestInterview.ai_feedback || latestInterview.feedback || `Last completed round: ${latestInterview.interview_type || 'Technical Interview'}`;
   }
+
+  // Phase 10 Application Tracking & Placement Pipeline Intelligence
+  const pipelineStats = dashboardData?.pipelineStats || null;
+  const applications = dashboardData?.applications || [];
+  const upcomingAppEvent = dashboardData?.upcomingApplicationEvent || null;
+  const recentApp = dashboardData?.recentApplication || applications[0] || null;
+  const hasApplications = applications.length > 0;
+  const activeAppsCount = pipelineStats?.activeCount ?? 0;
+  const interviewAppsCount = pipelineStats?.interviewCount ?? 0;
+  const offerAppsCount = pipelineStats?.offerCount ?? 0;
+  const selectedAppsCount = pipelineStats?.selectedCount ?? 0;
 
   // 7 Core Dimensions for Placement Readiness from Centralized Engine (Zero Hardcoded values)
   const readinessDimensions = (readinessReport?.pillars || [
@@ -832,6 +844,89 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           </div>
         </div>
 
+      </div>
+
+      {/* Dedicated PLACEMENT PIPELINE & APPLICATION TRACKING Card (Phase 10) */}
+      <div className="saas-card p-6 border-indigo-100/80 bg-linear-to-r from-white via-slate-50/40 to-indigo-50/20 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 shadow-2xs">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">PLACEMENT PIPELINE</h3>
+                <Badge variant={hasApplications ? 'primary' : 'neutral'} size="xs">
+                  {hasApplications ? `${activeAppsCount} Active` : 'No Applications Yet'}
+                </Badge>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  {activeAppsCount}
+                </span>
+                <span className="text-slate-400 text-sm font-bold">Active Applications</span>
+                {hasApplications && (
+                  <span className="text-xs text-slate-500 font-medium ml-2">
+                    • {interviewAppsCount} Interview{interviewAppsCount !== 1 ? 's' : ''} • {offerAppsCount} Offer{offerAppsCount !== 1 ? 's' : ''} • {selectedAppsCount} Selected
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigate(hasApplications ? 'applications' : 'job-opportunities')}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5"
+          >
+            <span>{hasApplications ? 'View Applications Pipeline' : 'Explore Placement Opportunities'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Content Row: Next Action / Recent Application or Empty State */}
+        {!hasApplications ? (
+          <div className="py-4 text-center space-y-2">
+            <p className="text-xs font-bold text-slate-700">No applications tracked yet</p>
+            <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+              Explore open placement drives, verify your academic eligibility and match score, and apply to track your recruitment stages.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 text-xs">
+            {/* Left: Upcoming Action */}
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-1.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                {upcomingAppEvent?.hasDate ? 'Scheduled Action' : 'Next Recommended Step'}
+              </span>
+              <p className="font-bold text-slate-900 truncate">
+                {upcomingAppEvent?.title || 'Review recruitment progress'}
+              </p>
+              <p className="text-[11px] text-slate-500 line-clamp-1">
+                {upcomingAppEvent?.description || 'Track your candidate milestones across all rounds.'}
+              </p>
+            </div>
+
+            {/* Right: Most Recent Application */}
+            {recentApp && (
+              <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Recent Application
+                  </span>
+                  <Badge variant={recentApp.status === 'selected' ? 'success' : (recentApp.status === 'interview' ? 'primary' : 'neutral')} size="xs">
+                    {recentApp.status ? (recentApp.status.charAt(0).toUpperCase() + recentApp.status.slice(1)) : 'Applied'}
+                  </Badge>
+                </div>
+                <p className="font-bold text-slate-900 truncate">
+                  {recentApp.company_name} — <span className="font-medium text-slate-600">{recentApp.role_title}</span>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Updated: {new Date(recentApp.updated_at || recentApp.applied_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 6. Third 2-Column Grid: Placement Opportunities & Recent Activity */}
