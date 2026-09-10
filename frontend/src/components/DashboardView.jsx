@@ -1,3 +1,4 @@
+import { generatePlacementStrategy, STUDENT_READINESS_STAGES } from '../lib/studentSuccessEngine';
 import React from 'react';
 import { 
   Target, 
@@ -445,6 +446,97 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* Phase 17 YOUR PLACEMENT STRATEGY Hero Card */}
+      {(() => {
+        const studentStrategy = generatePlacementStrategy({
+          profile,
+          userSkills: dashboardData?.skills || [],
+          attempts: dashboardData?.attempts || [],
+          resumes: dashboardData?.resumes || [],
+          latestResume,
+          interviews: allInterviews,
+          applications: dashboardData?.applications || [],
+          opportunities: dashboardData?.opportunities || [],
+          readinessReport
+        });
+        const currentStage = studentStrategy?.stage || STUDENT_READINESS_STAGES.GETTING_STARTED;
+        const weekly = studentStrategy?.weeklyStrategy;
+        const primaryGap = studentStrategy?.primarySkillGap;
+        const topBlocker = studentStrategy?.topBlocker;
+
+        return (
+          <div className="saas-card p-6 sm:p-7 border-indigo-200/80 bg-linear-to-br from-white via-indigo-50/20 to-purple-50/30 shadow-xs space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-200">
+                  <Target className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-900">
+                      YOUR PLACEMENT STRATEGY
+                    </span>
+                    <Badge variant={currentStage.variant || 'primary'} size="xs">
+                      Stage: {currentStage.label}
+                    </Badge>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5">
+                    {weekly?.topPriority?.title || 'Personalized Placement Action Plan'}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onNavigate(weekly?.topPriority?.actionRoute || 'preparation')}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <span>{weekly?.topPriority?.actionText || 'Take Next Action'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 3-Column Telemetry: Stage & Readiness, Top Focus, What to Ignore */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Current Status
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-black text-slate-900">
+                    {hasReadiness ? `${readinessScore}/100` : 'Not Evaluated'}
+                  </span>
+                  <span className="text-xs font-bold text-indigo-600">{currentStage.label}</span>
+                </div>
+                <p className="text-[11px] text-slate-500 line-clamp-2">{currentStage.description}</p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Primary Focus This Week
+                </span>
+                <p className="text-xs font-bold text-slate-900 truncate">
+                  {primaryGap ? `Close Gap in ${primaryGap.skill} (${primaryGap.score}%)` : 'Diagnostic Assessments'}
+                </p>
+                <p className="text-[11px] text-slate-600 line-clamp-2">
+                  {topBlocker ? topBlocker.reason : weekly?.reason || 'Focus your preparation on closing your largest readiness deficit.'}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700">
+                  Strategic Advice: What to Ignore
+                </span>
+                <p className="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
+                  {studentStrategy?.whatToIgnore || 'Avoid distractions on niche topics. Focus strictly on your primary screening barrier.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Phase 16 Adaptive Practice Quick Banner */}
       <div className="p-4 sm:p-5 rounded-2xl bg-linear-to-r from-indigo-50/70 via-white to-purple-50/50 border border-indigo-100/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

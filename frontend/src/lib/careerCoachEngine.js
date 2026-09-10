@@ -1,3 +1,4 @@
+import { generatePlacementStrategy } from './studentSuccessEngine.js';
 import { selectAdaptiveQuestions } from './questionIntelligenceEngine.js';
 /**
  * careerCoachEngine.js
@@ -41,6 +42,9 @@ import { buildFullInterviewIntelligence } from './interviewIntelligenceEngine.js
 
 // Canonical Quick Prompts
 export const QUICK_PROMPTS = [
+  { id: 'weekly_focus', label: 'What should I focus on this week?', prompt: 'What should I focus on this week to maximize my placement readiness?' },
+  { id: 'blockers', label: 'What is blocking my placement?', prompt: 'What is currently blocking me from being placement ready?' },
+  { id: 'what_to_ignore', label: 'What should I ignore for now?', prompt: 'What should I ignore for now to avoid wasting preparation time?' },
   { id: 'practice_next', label: 'What should I practice next?', prompt: 'What questions should I practice next to improve my placement readiness?' },
   { id: 'daily_action', label: 'What should I do today?', prompt: 'What should I prepare today based on my current placement data?' },
   { id: 'readiness_why', label: 'Why is my readiness score low?', prompt: 'Why is my readiness score low and how can I raise it?' },
@@ -341,6 +345,21 @@ export function detectUserIntent(message = '') {
   }
   if (m.includes('application') || m.includes('pipeline') || m.includes('attention') || m.includes('status') || m.includes('offer')) {
     return 'application_pipeline';
+  }
+  if (m.includes('block') || m.includes('preventing') || m.includes('holding me back') || m.includes('what is blocking')) {
+    return 'placement_blockers';
+  }
+  if (m.includes('this week') || m.includes('focus on this week') || m.includes('weekly priority') || m.includes('weekly strategy') || m.includes('what to focus')) {
+    return 'weekly_strategy';
+  }
+  if (m.includes('how close am i') || m.includes('how far') || m.includes('readiness stage') || m.includes('what stage')) {
+    return 'readiness_stage';
+  }
+  if (m.includes('what should i do first') || m.includes('do first') || m.includes('highest priority') || m.includes('start first')) {
+    return 'top_priority';
+  }
+  if (m.includes('ignore') || m.includes('what to ignore') || m.includes('what should i ignore') || m.includes('waste of time')) {
+    return 'what_to_ignore';
   }
   if (m.includes('practice') || m.includes('question') || m.includes('what should i practice') || m.includes('questions will improve')) {
     return 'adaptive_practice';
@@ -897,7 +916,107 @@ export function generateDeterministicCoachResponse(intent, context, originalMess
     };
   }
 
-  // 9. ADAPTIVE PRACTICE (Phase 16)
+  // 9. PHASE 17 PERSONALIZED PLACEMENT STRATEGY INTENTS
+  if (['placement_blockers', 'weekly_strategy', 'readiness_stage', 'top_priority', 'what_to_ignore'].includes(intent)) {
+    const rawCandidate = {
+      profile: { target_role: candidate.targetRole || candidate.preferredRole || 'Software Engineer' },
+      userSkills: (skillGaps.allGaps || []).map(g => ({ skill_name: g.name, score: g.score })),
+      attempts: skillGaps.totalAssessed > 0 ? [{ score: skillGaps.overallCompetencyIndex }] : [],
+      interviews: mockInterview.hasInterview ? [{ overall_score: mockInterview.overallScore }] : [],
+      resumes: resume.hasResume ? [{ ats_score: resume.atsScore }] : [],
+      latestResume: resume.hasResume ? { ats_score: resume.atsScore } : null,
+      readinessReport: { score: readiness.score, pillars: readiness.pillars || [] },
+      applications: applications.total > 0 ? [{ id: 'app', status: 'applied' }] : []
+    };
+
+    const strategy = generatePlacementStrategy(rawCandidate);
+    const { stage, blockers, weeklyStrategy, fastestPathToReadiness, whatToIgnore, primarySkillGap } = strategy;
+
+    if (intent === 'placement_blockers') {
+      return {
+        summary: blockers.length > 0
+          ? `Based on your platform data, you have ${blockers.length} active blocker(s) impacting your placement readiness. Primary blocker: "${blockers[0].title}".`
+          : 'You currently have zero critical placement blockers! Your foundational benchmarks are established.',
+        facts: blockers.length > 0
+          ? blockers.map(b => `Blocker [${b.severity.toUpperCase()}]: ${b.title} — ${b.impact}`)
+          : ['All evaluated screening benchmarks are in good standing.', 'Continue advancing active campus drive applications.'],
+        recommendations: blockers.length > 0
+          ? blockers.map(b => `Action: ${b.actionText} (resolves ${b.type.replace('_', ' ')})`)
+          : ['Practice verbal technical articulation in AI Mock Interviews.', 'Review active campus recruitment deadlines.'],
+        next_action: {
+          label: blockers[0]?.actionText || 'View Placement Strategy',
+          route: blockers[0]?.actionRoute || 'dashboard'
+        },
+        sources: ['Personalization Engine', SOURCE_LABELS.READINESS],
+        disclaimer
+      };
+    }
+
+    if (intent === 'what_to_ignore') {
+      return {
+        summary: 'To protect against cognitive overload and preparation distraction, here is what you should IGNORE right now:',
+        facts: [
+          `Current Readiness Stage: ${stage.label}`,
+          `Placement Readiness Score: ${readiness.score !== null ? `${readiness.score}/100` : 'Unassessed'}`,
+          `Strategic Focus: ${weeklyStrategy.topPriority?.title || 'Foundational Benchmarking'}`
+        ],
+        recommendations: [
+          whatToIgnore,
+          'Focus 80% of your daily study time strictly on your primary blocker before exploring ancillary frameworks.'
+        ],
+        next_action: {
+          label: weeklyStrategy.topPriority?.actionText || 'Focus on Top Priority',
+          route: weeklyStrategy.topPriority?.actionRoute || 'dashboard'
+        },
+        sources: ['Personalization Strategy', SOURCE_LABELS.SKILL_GAP],
+        disclaimer
+      };
+    }
+
+    if (intent === 'readiness_stage') {
+      return {
+        summary: `You are currently in the "${stage.label}" stage (${readiness.score !== null ? `${readiness.score}/100 Readiness` : 'Coverage needed'}). ${stage.headline}`,
+        facts: [
+          `Placement Stage: ${stage.label}`,
+          `Placement Readiness Index: ${readiness.score !== null ? `${readiness.score}/100` : 'Uncalculated (0 evaluated pillars)'}`,
+          `Stage Description: ${stage.description}`
+        ],
+        recommendations: [
+          `Top Focus: ${weeklyStrategy.topPriority?.title}`,
+          fastestPathToReadiness[0] ? `Fastest Boost: ${fastestPathToReadiness[0].actionTitle} (+${fastestPathToReadiness[0].potentialGain} pts)` : 'Take diagnostic assessments to calculate highest-yield gains.'
+        ],
+        next_action: {
+          label: weeklyStrategy.topPriority?.actionText || 'Advance Stage',
+          route: weeklyStrategy.topPriority?.actionRoute || 'dashboard'
+        },
+        sources: ['Personalization Engine', SOURCE_LABELS.READINESS],
+        disclaimer
+      };
+    }
+
+    // Default for weekly_strategy and top_priority
+    return {
+      summary: `Your personalized strategy for this week is focused on "${weeklyStrategy.topPriority?.title}". Current Stage: ${stage.label}.`,
+      facts: [
+        `Weekly Top Priority: ${weeklyStrategy.topPriority?.title}`,
+        `Current Readiness Stage: ${stage.label} (${readiness.score !== null ? `${readiness.score}/100` : 'Needs Evaluation'})`,
+        primarySkillGap ? `Primary Skill Gap: ${primarySkillGap.skill} (${primarySkillGap.score}%)` : 'Primary Gap: Diagnostic benchmarking needed'
+      ],
+      recommendations: [
+        weeklyStrategy.actions.skillAction ? `${weeklyStrategy.actions.skillAction.title} — ${weeklyStrategy.actions.skillAction.description}` : 'Practice adaptive placement drills.',
+        weeklyStrategy.actions.resumeAction ? `${weeklyStrategy.actions.resumeAction.title}` : (weeklyStrategy.actions.interviewAction ? `${weeklyStrategy.actions.interviewAction.title}` : 'Maintain consistency across your daily plan.'),
+        `Strategic Advice: ${whatToIgnore}`
+      ],
+      next_action: {
+        label: weeklyStrategy.topPriority?.actionText || 'Start Weekly Priority',
+        route: weeklyStrategy.topPriority?.actionRoute || 'dashboard'
+      },
+      sources: ['Student Success Engine', SOURCE_LABELS.READINESS],
+      disclaimer
+    };
+  }
+
+  // 10. ADAPTIVE PRACTICE (Phase 16)
   if (intent === 'adaptive_practice') {
     const rawCandidate = {
       userSkills: (skillGaps.allGaps || []).map(g => ({ skill_name: g.name, score: g.score })),

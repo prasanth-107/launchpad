@@ -1,3 +1,4 @@
+import { generatePlacementStrategy } from '../lib/studentSuccessEngine';
 import React, { useState, useEffect } from 'react';
 import {
   CheckSquare,

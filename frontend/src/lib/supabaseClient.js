@@ -1,3 +1,4 @@
+import { generatePlacementStrategy, determineStudentReadinessStage, STUDENT_READINESS_STAGES } from './studentSuccessEngine.js';
 import {
   selectAdaptiveQuestions,
   computeNextAdaptiveDifficulty,
@@ -2198,6 +2199,63 @@ export const dal = {
       };
 
       return selectAdaptiveQuestions(candidateContext, options);
+    }
+  },
+
+  // 19. AI Placement Personalization & Student Success Engine (Phase 17)
+  studentSuccess: {
+    async getPlacementStrategy(userId) {
+      const [
+        profile,
+        userSkills,
+        attempts,
+        courses,
+        courseProgress,
+        learningPaths,
+        resumes,
+        interviews,
+        applications,
+        savedJobs
+      ] = await Promise.all([
+        dal.profiles.get(userId),
+        dal.user_skills.getByUser(userId),
+        dal.assessment_attempts.getByUser(userId),
+        dal.courses.getAll(),
+        dal.course_progress.getByUser(userId),
+        dal.learning_paths.getByUser(userId),
+        dal.resumes.getByUser(userId),
+        dal.mock_interviews.getByUser(userId),
+        dal.applications.getAll(userId),
+        dal.savedJobs.list(userId)
+      ]);
+
+      const readinessReport = computePlacementReadiness({
+        attempts,
+        userSkills,
+        resumes,
+        interviews,
+        progress: courseProgress,
+        profile
+      });
+
+      const candidateContext = {
+        profile,
+        userSkills,
+        attempts,
+        courses,
+        courseProgress,
+        learningPaths,
+        resumes,
+        latestResume: resumes && resumes.length > 0 ? resumes[0] : null,
+        interviews,
+        applications,
+        opportunities: PLACEMENT_OPPORTUNITIES_CATALOG,
+        savedJobs,
+        readinessReport,
+        targetRole: profile?.target_role || profile?.preferred_job_role || 'Software Engineer'
+      };
+
+      return generatePlacementStrategy(candidateContext);
     }
   }
 };
