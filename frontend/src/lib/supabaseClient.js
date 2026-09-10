@@ -20,6 +20,7 @@ import {
   calculateApplicationStatistics,
   getUpcomingApplicationEvent
 } from './applicationPipelineEngine.js';
+import { buildCareerCoachContext } from './careerCoachEngine.js';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -61,6 +62,8 @@ function getLocalStore() {
       if (!parsed.saved_jobs) parsed.saved_jobs = [];
       if (!parsed.tracked_applications) parsed.tracked_applications = [];
       if (!parsed.applications) parsed.applications = parsed.tracked_applications || [];
+      if (!parsed.coach_sessions) parsed.coach_sessions = [];
+      if (!parsed.coach_messages) parsed.coach_messages = [];
       return parsed;
     }
   } catch (e) {
@@ -1417,6 +1420,147 @@ export const dal = {
         interviews,
         progress,
         profile
+      });
+    }
+  },
+
+  // 12. AI Career Coach & Placement Copilot DAL
+  coach: {
+    async getSessions(userId) {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('coach_sessions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        if (!error && data) return data;
+      }
+      const store = loadLocalStore();
+      return (store.coach_sessions || [])
+        .filter(s => s.user_id === userId)
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    },
+
+    async createSession(userId, title = 'Placement Coaching Session') {
+      const newSession = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `session-${Date.now()}`,
+        user_id: userId,
+        title,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('coach_sessions')
+          .insert([newSession])
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
+
+      const store = loadLocalStore();
+      if (!store.coach_sessions) store.coach_sessions = [];
+      store.coach_sessions.unshift(newSession);
+      saveLocalStore(store);
+      return newSession;
+    },
+
+    async getMessages(sessionId, userId) {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('coach_messages')
+          .select('*')
+          .eq('session_id', sessionId)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+        if (!error && data) return data;
+      }
+      const store = loadLocalStore();
+      return (store.coach_messages || [])
+        .filter(m => m.session_id === sessionId && m.user_id === userId)
+        .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    },
+
+    async saveMessage(sessionId, userId, role, content) {
+      const msg = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `msg-${Date.now()}`,
+        session_id: sessionId,
+        user_id: userId,
+        role,
+        content,
+        created_at: new Date().toISOString()
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('coach_messages')
+          .insert([msg])
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
+
+      const store = loadLocalStore();
+      if (!store.coach_messages) store.coach_messages = [];
+      store.coach_messages.push(msg);
+      saveLocalStore(store);
+      return msg;
+    },
+
+    async clearSession(sessionId, userId) {
+      if (isSupabaseConfigured && supabase) {
+        await supabase
+          .from('coach_messages')
+          .delete()
+          .eq('session_id', sessionId)
+          .eq('user_id', userId);
+      }
+      const store = loadLocalStore();
+      if (store.coach_messages) {
+        store.coach_messages = store.coach_messages.filter(
+          m => !(m.session_id === sessionId && m.user_id === userId)
+        );
+        saveLocalStore(store);
+      }
+      return true;
+    },
+
+    async buildContext(userId) {
+      const [
+        profile,
+        attempts,
+        userSkills,
+        courses,
+        courseProgress,
+        resumes,
+        interviews,
+        opportunities,
+        applications
+      ] = await Promise.all([
+        dal.profiles.get(userId),
+        dal.assessments.getAttempts(userId),
+        dal.skills.getUserSkills(userId),
+        dal.courses.getAll(),
+        dal.courses.getProgress(userId),
+        dal.resumes.list(userId),
+        dal.interviews.list(userId),
+        dal.opportunities.list(),
+        dal.applications.list(userId)
+      ]);
+
+      return buildCareerCoachContext({
+        userId,
+        profile,
+        attempts,
+        userSkills,
+        courses,
+        courseProgress,
+        resumes,
+        interviews,
+        opportunities,
+        applications,
+        context_generated_at: new Date().toISOString()
       });
     }
   }

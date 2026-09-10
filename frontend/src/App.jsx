@@ -14,6 +14,7 @@ import JobOpportunitiesView from './components/JobOpportunitiesView';
 import ApplicationTrackingView from './components/ApplicationTrackingView';
 import SkillsCertificatesView from './components/SkillsCertificatesView';
 import ProfileSettingsView from './components/ProfileSettingsView';
+import { CareerCoachView } from './components/CareerCoachView';
 import AuthView from './components/AuthView';
 import AuthModal from './components/AuthModal';
 import { apiClient } from './api/client';
@@ -271,6 +272,13 @@ export default function App() {
         <DashboardView
           dashboardData={dashboardData}
           onNavigate={(tab) => setActiveTab(tab)}
+        />
+      )}
+
+      {activeTab === 'career-coach' && (
+        <CareerCoachView
+          user={user}
+          onNavigate={handleNavigate}
         />
       )}
 

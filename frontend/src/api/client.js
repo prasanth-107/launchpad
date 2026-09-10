@@ -210,5 +210,33 @@ export const apiClient = {
       body: JSON.stringify(data)
     });
     return await res.json();
+  },
+
+  // AI Career Coach & Placement Copilot
+  async coachChat({ message, sessionId = null, candidateContext = null, token = null }) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    }
+    const res = await fetch(`${API_BASE}/coach/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        message,
+        session_id: sessionId,
+        candidate_context: candidateContext
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to get coach response');
+    }
+    return await res.json();
+  },
+
+  async getCoachQuickPrompts() {
+    const res = await fetch(`${API_BASE}/coach/quick-prompts`);
+    if (!res.ok) return { prompts: [] };
+    return await res.json();
   }
 };

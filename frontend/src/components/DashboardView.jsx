@@ -23,7 +23,8 @@ import {
   Building2,
   MapPin,
   DollarSign,
-  Layers
+  Layers,
+  Bot
 } from 'lucide-react';
 import { StatCard } from './ui/StatCard';
 import { ProgressBar } from './ui/ProgressBar';
@@ -236,6 +237,37 @@ export default function DashboardView({ dashboardData, onNavigate }) {
             <span>Placement Drives</span>
           </button>
         </div>
+      </div>
+
+      {/* 1B. AI CAREER COACH Widget (Phase 11 Placement Copilot) */}
+      <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-xl p-4 sm:p-5 text-white shadow-xs border border-indigo-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-indigo-200">
+            <Bot className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold tracking-wider uppercase text-indigo-200">AI CAREER COACH</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/30 text-indigo-100 border border-indigo-400/30">
+                Placement Copilot
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm font-semibold text-white mt-0.5">
+              {!hasReadiness && (!dashboardData?.skillGaps || dashboardData?.skillGaps?.length === 0)
+                ? 'Complete your first assessment to start personalized coaching.'
+                : readinessReport?.priorityGap
+                ? `Your next best action: Improve ${readinessReport.priorityGap.name} (${readinessReport.priorityGap.score}% score) before your next assessment.`
+                : 'Your next best action: Maintain readiness with mock interviews and explore matching campus drives.'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onNavigate('career-coach')}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-white text-indigo-950 hover:bg-indigo-50 text-xs font-bold transition-all shadow-sm shrink-0 self-start sm:self-auto cursor-pointer"
+        >
+          <span>Open Career Coach</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* 2. Primary Metric Hero Card: PLACEMENT READINESS (7 Dimensions) */}

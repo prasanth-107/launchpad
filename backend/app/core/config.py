@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     
     # AI and External APIs
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    AI_MODEL_NAME: str = os.getenv("AI_MODEL_NAME", "gemini-1.5-flash")
     YOUTUBE_API_KEY: str = os.getenv("YOUTUBE_API_KEY", "")
     
     # CORS

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import (
     auth, profile, dashboard, assessments, roadmap,
-    content, youtube, interview, resume, recommendations, admin
+    content, youtube, interview, resume, recommendations, admin, coach
 )
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.include_router(interview.router, prefix=settings.API_V1_STR)
 app.include_router(resume.router, prefix=settings.API_V1_STR)
 app.include_router(recommendations.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
+app.include_router(coach.router, prefix=settings.API_V1_STR)
 
 @app.get("/api/health")
 def health_check():

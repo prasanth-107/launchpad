@@ -19,7 +19,8 @@ import {
   LogOut,
   GraduationCap,
   ChevronRight,
-  Layers
+  Layers,
+  Bot
 } from 'lucide-react';
 
 export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClose }) {
@@ -28,6 +29,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
       title: 'OVERVIEW',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'career-coach', label: 'AI Career Coach', icon: Bot },
         { id: 'skill-gap', label: 'Skill Gap Analysis', icon: Target },
         { id: 'placement-readiness', label: 'Placement Readiness', icon: Sparkles },
         { id: 'overall-report', label: 'Overall Report', icon: BarChart3 },
