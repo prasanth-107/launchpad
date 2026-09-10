@@ -1,0 +1,6 @@
+/* Custom layout tweaks for Modern Placement Launchpad */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
