@@ -61,10 +61,31 @@ class AssessmentDatabase:
         self.attempts: Dict[str, Dict[str, Any]] = {}
 
     def get_questions_by_category(self, category: str) -> List[Dict[str, Any]]:
-        cat_lower = category.lower()
-        if cat_lower == "all":
+        cat_lower = category.strip().lower()
+        if not cat_lower or cat_lower == "all":
             return self.questions
-        return [q for q in self.questions if q.get("category", "").lower() == cat_lower]
+        
+        # Category alias groups
+        category_aliases = {
+            "web development": ["javascript", "html", "css", "web development", "react"],
+            "database": ["sql", "database", "relational"],
+            "aptitude": ["quantitative aptitude", "logical reasoning", "verbal ability", "aptitude"],
+            "programming": ["python", "java", "c++", "c", "programming"],
+            "data structures": ["data structures", "algorithms", "dsa"]
+        }
+
+        target_matches = category_aliases.get(cat_lower, [cat_lower])
+
+        matched = []
+        for q in self.questions:
+            q_cat = q.get("category", "").lower()
+            q_skill = q.get("skill", "").lower()
+            if any(target in q_cat or target in q_skill or q_cat in target for target in target_matches):
+                matched.append(q)
+            elif cat_lower in q_cat or cat_lower in q_skill:
+                matched.append(q)
+
+        return matched if matched else [q for q in self.questions if q.get("category", "").lower() == cat_lower]
 
     def get_all_categories(self) -> List[str]:
         return sorted(list(set(q.get("category", "") for q in self.questions if q.get("category"))))

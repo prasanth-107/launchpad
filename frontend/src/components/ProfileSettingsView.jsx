@@ -51,6 +51,7 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
 
   // Resume status tracking for completion score
   const [hasResume, setHasResume] = useState(Boolean(user?.has_resume || user?.resume));
+  const [userSkillsList, setUserSkillsList] = useState([]);
 
   // Password change state
   const [newPassword, setNewPassword] = useState('');
@@ -64,7 +65,7 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
   const [youtubeApiKey, setYoutubeApiKey] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
 
-  // Check resume state from database
+  // Check resume and verified skills from database
   useEffect(() => {
     if (user?.id) {
       dal.resumes.getLatest(user.id).then(res => {
@@ -73,6 +74,12 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
         }
       }).catch(() => {
         setHasResume(true);
+      });
+
+      dal.skills.getUserSkills(user.id).then(list => {
+        setUserSkillsList(list || []);
+      }).catch(err => {
+        console.warn('Could not load user skills:', err);
       });
     }
   }, [user?.id]);
@@ -115,8 +122,8 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
     {
       id: 'skills',
       title: 'Technical Skills Matrix',
-      description: 'At least 3 verified technical skills or frameworks',
-      isComplete: Boolean(skills?.trim() && skills.split(',').map(s => s.trim()).filter(Boolean).length >= 3),
+      description: 'At least 1 assessment-verified technical skill',
+      isComplete: Boolean(userSkillsList.some(s => s.verified)),
       weight: 20
     },
     {

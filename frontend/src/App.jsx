@@ -179,13 +179,19 @@ export default function App() {
   };
 
   const handleAssessmentCompleted = async (result) => {
-    await dal.assessments.recordAttempt(user.id, {
-      score_percent: result.percentage || 80,
-      questions_attempted: result.total_questions || 15,
-      correct_answers: result.correct || 12,
-      time_taken_seconds: result.time_taken || 1200,
-      details: result
-    });
+    if (!result?._alreadySaved) {
+      await dal.assessments.recordAttempt(user.id, {
+        assessment_id: result.assessment_id,
+        assessment_title: result.assessment_title || result.category,
+        category: result.category,
+        score_percent: Number(result.percentage) || 0,
+        passed: result.passed !== undefined ? result.passed : (Number(result.percentage) >= 70),
+        questions_attempted: Number(result.total || result.total_questions) || 0,
+        correct_answers: Number(result.correct) || 0,
+        time_taken_seconds: Number(result.time_spent_seconds || result.time_taken) || 0,
+        details: result
+      });
+    }
     showNotification(`Assessment saved to database! Score: ${result.percentage}%. Placement Readiness updated.`);
     refreshDashboard(user.id);
   };
@@ -332,9 +338,11 @@ export default function App() {
         <JobOpportunitiesView />
       )}
 
-      {(activeTab === 'skills' || activeTab === 'certificates') && (
+      {(activeTab === 'skills' || activeTab === 'certificates' || activeTab === 'skill-gap') && (
         <SkillsCertificatesView
           user={user}
+          initialTab={activeTab === 'certificates' ? 'certificates' : activeTab === 'skills' ? 'skills' : 'skill-gap'}
+          onNavigate={(tab) => setActiveTab(tab)}
         />
       )}
 

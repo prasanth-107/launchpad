@@ -5,6 +5,7 @@
  * and a high-fidelity persistent adapter for offline evaluation.
  */
 import { createClient } from '@supabase/supabase-js';
+import { computeSkillGaps } from './skillGapEngine';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -88,23 +89,16 @@ function initDefaultStore() {
     ],
     // 4. assessments
     assessments: [
-      { id: 'a1', title: 'Data Structures & Algorithms Diagnostic', category: 'Data Structures', duration_mins: 45, total_questions: 15, difficulty: 'Hard', passing_percent: 75 },
-      { id: 'a2', title: 'Modern JavaScript & React Ecosystem', category: 'Web Development', duration_mins: 30, total_questions: 15, difficulty: 'Medium', passing_percent: 70 },
-      { id: 'a3', title: 'SQL Queries & Relational Normalization', category: 'Database', duration_mins: 30, total_questions: 12, difficulty: 'Medium', passing_percent: 75 },
-      { id: 'a4', title: 'Campus Quantitative Aptitude Screening', category: 'Aptitude', duration_mins: 35, total_questions: 20, difficulty: 'Medium', passing_percent: 70 }
+      { id: 'a1', title: 'Data Structures & Algorithms Diagnostic', category: 'Data Structures', duration_mins: 45, total_questions: 6, difficulty: 'Hard', passing_percent: 75, description: 'Evaluate dynamic programming, graph traversal, binary trees, and complexity analysis.' },
+      { id: 'a2', title: 'Modern JavaScript & React Ecosystem', category: 'Web Development', duration_mins: 30, total_questions: 6, difficulty: 'Medium', passing_percent: 70, description: 'Closures, Event Loop, Promises, React Hooks, and component rendering cycles.' },
+      { id: 'a3', title: 'SQL Queries & Relational Normalization', category: 'Database', duration_mins: 30, total_questions: 5, difficulty: 'Medium', passing_percent: 75, description: 'Multi-table JOINs, subqueries, grouping, 3NF normalization, and indexing.' },
+      { id: 'a4', title: 'Campus Quantitative Aptitude Screening', category: 'Aptitude', duration_mins: 35, total_questions: 5, difficulty: 'Medium', passing_percent: 70, description: 'Speed math, time & distance, work equations, permutations, and probability.' },
+      { id: 'a5', title: 'Python Core & Algorithmic Problem Solving', category: 'Python', duration_mins: 25, total_questions: 4, difficulty: 'Easy', passing_percent: 70, description: 'List comprehension, dictionaries, decorators, and algorithmic complexity.' },
+      { id: 'a6', title: 'Core Java & Object-Oriented Architecture', category: 'Java', duration_mins: 25, total_questions: 3, difficulty: 'Medium', passing_percent: 70, description: 'OOP principles, inheritance, JVM memory, and collections framework.' },
+      { id: 'a7', title: 'Logical Reasoning & Analytical Deduction', category: 'Logical Reasoning', duration_mins: 25, total_questions: 2, difficulty: 'Medium', passing_percent: 70, description: 'Blood relations, numerical sequences, and analytical deduction puzzles.' }
     ],
-    // 5. assessment_attempts (27 completed attempts to match PRASANTH's verified record)
-    assessment_attempts: Array.from({ length: 27 }, (_, i) => ({
-      id: `att-${i + 1}`,
-      user_id: demoUserId,
-      assessment_id: i % 4 === 0 ? 'a1' : i % 4 === 1 ? 'a2' : i % 4 === 2 ? 'a3' : 'a4',
-      score_percent: 72 + ((i * 3) % 24),
-      passed: true,
-      questions_attempted: 15 + (i % 3),
-      correct_answers: 12 + (i % 3),
-      time_taken_seconds: 1200 + (i * 45),
-      created_at: new Date(Date.now() - (27 - i) * 86400000).toISOString()
-    })),
+    // 5. assessment_attempts (starts clean; all scores come from real candidate submissions)
+    assessment_attempts: [],
     // 6. skills
     skills: [
       { id: 's1', name: 'Python', category: 'Programming' },
@@ -117,18 +111,8 @@ function initDefaultStore() {
       { id: 's8', name: 'Aptitude', category: 'Problem Solving' },
       { id: 's9', name: 'Communication', category: 'Soft Skills' }
     ],
-    // 7. user_skills (12 mastered / proficient skills)
-    user_skills: [
-      { id: 'us1', user_id: demoUserId, skill_name: 'Python', proficiency_percent: 88, status: 'mastered', verified: true },
-      { id: 'us2', user_id: demoUserId, skill_name: 'JavaScript', proficiency_percent: 84, status: 'mastered', verified: true },
-      { id: 'us3', user_id: demoUserId, skill_name: 'React.js', proficiency_percent: 80, status: 'mastered', verified: true },
-      { id: 'us4', user_id: demoUserId, skill_name: 'Data Structures', proficiency_percent: 82, status: 'mastered', verified: true },
-      { id: 'us5', user_id: demoUserId, skill_name: 'SQL', proficiency_percent: 74, status: 'learning', verified: false },
-      { id: 'us6', user_id: demoUserId, skill_name: 'Algorithms', proficiency_percent: 78, status: 'mastered', verified: true },
-      { id: 'us7', user_id: demoUserId, skill_name: 'System Design', proficiency_percent: 70, status: 'learning', verified: false },
-      { id: 'us8', user_id: demoUserId, skill_name: 'Aptitude', proficiency_percent: 76, status: 'mastered', verified: true },
-      { id: 'us9', user_id: demoUserId, skill_name: 'Communication', proficiency_percent: 70, status: 'learning', verified: false }
-    ],
+    // 7. user_skills (starts empty; verified dynamically from real candidate assessment submissions)
+    user_skills: [],
     // 8. resumes
     resumes: [
       {
@@ -439,36 +423,103 @@ export const dal = {
 
     async getAttempts(userId) {
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('assessment_attempts').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-        if (!error && data) return data;
+        const { data, error } = await supabase
+          .from('assessment_attempts')
+          .select('*, assessments(*)')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          const formatted = data.map(item => ({
+            ...item,
+            assessment_title: item.assessments?.title || item.details?.assessment_title || item.category || 'Skill Assessment',
+            category: item.assessments?.category || item.category || item.details?.category || 'Technical'
+          }));
+          return formatted;
+        }
       }
       const store = getLocalStore();
-      return store.assessment_attempts.filter(a => a.user_id === userId);
+      return (store.assessment_attempts || []).filter(a => a.user_id === userId);
     },
 
     async recordAttempt(userId, attemptData) {
-      const record = {
+      const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      let resolvedAssessmentId = attemptData.assessment_id;
+
+      if (isSupabaseConfigured && supabase) {
+        // If assessment_id is not a UUID, resolve it against public.assessments table
+        if (!isUuid(resolvedAssessmentId)) {
+          const searchKey = attemptData.category || attemptData.assessment_title || resolvedAssessmentId;
+          const { data: matched } = await supabase
+            .from('assessments')
+            .select('id, title, category')
+            .or(`category.ilike.%${searchKey}%,title.ilike.%${searchKey}%`)
+            .limit(1);
+          if (matched && matched.length > 0) {
+            resolvedAssessmentId = matched[0].id;
+          }
+        }
+
+        const supabasePayload = {
+          user_id: userId,
+          assessment_id: isUuid(resolvedAssessmentId) ? resolvedAssessmentId : undefined,
+          score_percent: Number(attemptData.score_percent) || 0,
+          passed: attemptData.passed !== undefined ? attemptData.passed : (Number(attemptData.score_percent) >= 70),
+          questions_attempted: Number(attemptData.questions_attempted) || 0,
+          correct_answers: Number(attemptData.correct_answers) || 0,
+          time_taken_seconds: Number(attemptData.time_taken_seconds) || 0,
+          details: attemptData.details || {},
+          created_at: new Date().toISOString()
+        };
+
+        try {
+          const { data, error } = await supabase.from('assessment_attempts').insert(supabasePayload).select().single();
+          if (!error && data) {
+            const store = getLocalStore();
+            store.assessment_attempts.unshift(data);
+            saveLocalStore(store);
+            return data;
+          }
+          if (error) console.error('Supabase attempt insert warning:', error.message);
+        } catch (err) {
+          console.warn('Supabase attempt insert exception:', err);
+        }
+      }
+
+      const store = getLocalStore();
+      const localRecord = {
         id: 'att-' + Date.now(),
         user_id: userId,
-        assessment_id: attemptData.assessment_id || 'a1',
-        score_percent: attemptData.score_percent || 80,
-        passed: (attemptData.score_percent || 80) >= 70,
-        questions_attempted: attemptData.questions_attempted || 15,
-        correct_answers: attemptData.correct_answers || 12,
-        time_taken_seconds: attemptData.time_taken_seconds || 1200,
+        assessment_id: resolvedAssessmentId || 'a1',
+        assessment_title: attemptData.assessment_title || attemptData.category,
+        category: attemptData.category,
+        score_percent: Number(attemptData.score_percent) || 0,
+        passed: attemptData.passed !== undefined ? attemptData.passed : (Number(attemptData.score_percent) >= 70),
+        questions_attempted: Number(attemptData.questions_attempted) || 0,
+        correct_answers: Number(attemptData.correct_answers) || 0,
+        time_taken_seconds: Number(attemptData.time_taken_seconds) || 0,
         details: attemptData.details || {},
         created_at: new Date().toISOString()
       };
 
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('assessment_attempts').insert(record).select().single();
-        if (!error && data) return data;
+      store.assessment_attempts.unshift(localRecord);
+      saveLocalStore(store);
+
+      // Automatically sync assessment outcome to candidate's verified user_skills
+      const assessmentCategory = attemptData.category || attemptData.assessment_title;
+      if (assessmentCategory && userId) {
+        try {
+          await dal.skills.syncFromAssessment(
+            userId,
+            assessmentCategory,
+            attemptData.score_percent,
+            attemptData.details
+          );
+        } catch (e) {
+          console.warn('Sync skill from assessment notice:', e);
+        }
       }
 
-      const store = getLocalStore();
-      store.assessment_attempts.unshift(record);
-      saveLocalStore(store);
-      return record;
+      return localRecord;
     }
   },
 
@@ -476,41 +527,142 @@ export const dal = {
   skills: {
     async list() {
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('skills').select('*');
+        const { data, error } = await supabase.from('skills').select('*').order('name');
         if (!error && data?.length) return data;
       }
       return getLocalStore().skills;
     },
 
     async getUserSkills(userId) {
+      if (!userId) return [];
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('user_skills').select('*').eq('user_id', userId);
-        if (!error && data) return data;
+        const { data, error } = await supabase
+          .from('user_skills')
+          .select('*, skills(*)')
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false });
+        if (!error && data) {
+          return data.map(item => ({
+            id: item.id,
+            user_id: item.user_id,
+            skill_id: item.skill_id,
+            skill_name: item.skills?.name || item.skill_name || 'Technical Skill',
+            category: item.skills?.category || 'Technical',
+            proficiency_percent: Number(item.proficiency_percent) || 0,
+            status: item.status || 'learning',
+            verified: Boolean(item.verified),
+            updated_at: item.updated_at
+          }));
+        }
       }
       const store = getLocalStore();
-      return store.user_skills.filter(s => s.user_id === userId);
+      return (store.user_skills || []).filter(s => s.user_id === userId);
     },
 
-    async upsertUserSkill(userId, skillName, proficiencyPercent, status = 'proficient', verified = false) {
+    async upsertUserSkill(userId, skillName, proficiencyPercent = 0, status = 'learning', verified = false) {
+      if (!skillName || !userId) return null;
+      const cleanProficiency = Math.min(100, Math.max(0, Number(proficiencyPercent) || 0));
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          // Resolve skill_id from canonical public.skills table
+          let skillId = null;
+          const { data: matched } = await supabase
+            .from('skills')
+            .select('id, name, category')
+            .ilike('name', skillName)
+            .limit(1);
+
+          if (matched && matched.length > 0) {
+            skillId = matched[0].id;
+          } else {
+            // Register skill in public.skills if not found
+            const { data: newSkill } = await supabase
+              .from('skills')
+              .insert({ name: skillName, category: 'Technical' })
+              .select('id, name, category')
+              .single();
+            if (newSkill) skillId = newSkill.id;
+          }
+
+          if (skillId) {
+            const { data: upserted, error } = await supabase
+              .from('user_skills')
+              .upsert(
+                {
+                  user_id: userId,
+                  skill_id: skillId,
+                  proficiency_percent: cleanProficiency,
+                  status,
+                  verified: Boolean(verified),
+                  updated_at: new Date().toISOString()
+                },
+                { onConflict: 'user_id,skill_id' }
+              )
+              .select('*, skills(*)')
+              .single();
+
+            if (!error && upserted) {
+              const formatted = {
+                id: upserted.id,
+                user_id: upserted.user_id,
+                skill_id: upserted.skill_id,
+                skill_name: upserted.skills?.name || skillName,
+                category: upserted.skills?.category || 'Technical',
+                proficiency_percent: upserted.proficiency_percent,
+                status: upserted.status,
+                verified: upserted.verified,
+                updated_at: upserted.updated_at
+              };
+
+              const store = getLocalStore();
+              store.user_skills = (store.user_skills || []).filter(
+                s => !(s.user_id === userId && s.skill_name?.toLowerCase() === skillName.toLowerCase())
+              );
+              store.user_skills.unshift(formatted);
+              saveLocalStore(store);
+              return formatted;
+            }
+          }
+        } catch (err) {
+          console.warn('Supabase upsertUserSkill notice:', err);
+        }
+      }
+
+      // Local fallback
       const store = getLocalStore();
-      let record = store.user_skills.find(s => s.user_id === userId && s.skill_name === skillName);
+      store.user_skills = store.user_skills || [];
+      let record = store.user_skills.find(
+        s => s.user_id === userId && s.skill_name?.toLowerCase() === skillName.toLowerCase()
+      );
       if (record) {
-        record.proficiency_percent = proficiencyPercent;
+        record.proficiency_percent = cleanProficiency;
         record.status = status;
-        record.verified = verified;
+        record.verified = Boolean(verified);
+        record.updated_at = new Date().toISOString();
       } else {
         record = {
           id: 'us-' + Date.now(),
           user_id: userId,
           skill_name: skillName,
-          proficiency_percent: proficiencyPercent,
+          category: 'Technical',
+          proficiency_percent: cleanProficiency,
           status,
-          verified
+          verified: Boolean(verified),
+          updated_at: new Date().toISOString()
         };
-        store.user_skills.push(record);
+        store.user_skills.unshift(record);
       }
       saveLocalStore(store);
       return record;
+    },
+
+    async syncFromAssessment(userId, category, scorePercent, details) {
+      if (!category || !userId) return null;
+      const score = Number(scorePercent) || 0;
+      const verified = score >= 70;
+      const status = score >= 80 ? 'mastered' : verified ? 'proficient' : 'learning';
+      return await this.upsertUserSkill(userId, category, score, status, verified);
     }
   },
 
@@ -700,7 +852,7 @@ export const dal = {
       },
       subMetrics: {
         skillsMastered: `${masteredSkills.length} / ${totalSkillsTracked}`,
-        resumeAtsScore: resumeAtsScore.toString(),
+        resumeAtsScore: resumeAtsScore ? resumeAtsScore.toString() : '—',
         interviewsCompleted: interviewCount.toString()
       },
       learningProgress: {
@@ -714,22 +866,51 @@ export const dal = {
           { name: 'Database Architecture (PostgreSQL/SQL)', progress: 54, color: 'amber' }
         ]
       },
-      skillGaps: [
-        { name: 'Data Structures (Arrays, Trees, Graphs)', score: 82, color: 'emerald' },
-        { name: 'Algorithms & Dynamic Programming', score: 78, color: 'emerald' },
-        { name: 'Relational Databases (PostgreSQL / SQL)', score: 74, color: 'amber' },
-        { name: 'Web Architecture (React & FastAPI)', score: 85, color: 'emerald' },
-        { name: 'Aptitude & Logical Reasoning', score: 76, color: 'emerald' },
-        { name: 'Communication & Technical Articulation', score: 70, color: 'amber' },
-        { name: 'System Design & Scalability', score: 68, color: 'amber' }
-      ],
-      recentActivities: [
-        { title: 'Completed JavaScript Assessment', time: 'Today at 2:15 PM', type: 'test', status: 'Passed (84%)' },
-        { title: 'Completed React Component Patterns Course', time: 'Yesterday', type: 'course', status: 'Completed' },
-        { title: 'Uploaded Resume for ATS Verification', time: '2 days ago', type: 'resume', status: `Score: ${resumeAtsScore}/100` },
-        { title: 'Completed AI Technical Mock Interview', time: '3 days ago', type: 'interview', status: `Score: ${avgInterviewScore}%` },
-        { title: 'Mastered Python Syntax & Data Structures', time: '5 days ago', type: 'test', status: 'Verified' }
-      ]
+      skillGaps: (() => {
+        const courses = getLocalStore().courses || [];
+        const report = computeSkillGaps(attempts, userSkills, courses);
+        return report.domains.map(d => ({
+          name: d.name,
+          score: d.score,
+          target: d.targetScore,
+          gap: d.gapPercent,
+          color: d.classification.variant === 'success' ? 'emerald' : d.classification.variant === 'warning' ? 'amber' : 'rose',
+          status: d.classification.label,
+          recommendation: d.recommendation
+        }));
+      })(),
+      skillGapReport: (() => {
+        const courses = getLocalStore().courses || [];
+        return computeSkillGaps(attempts, userSkills, courses);
+      })(),
+      recentActivities: (() => {
+        const list = [];
+        attempts.slice(0, 3).forEach(a => {
+          list.push({
+            title: `Completed ${a.assessment_title || a.category} Assessment`,
+            time: new Date(a.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            type: 'test',
+            status: `${a.score_percent}% (${a.passed ? 'Passed' : 'Needs Prep'})`
+          });
+        });
+        progress.slice(0, 2).forEach(p => {
+          list.push({
+            title: `Course: ${p.course_title || 'Enrolled Course'}`,
+            time: 'In Progress',
+            type: 'course',
+            status: `${p.progress_percent || 0}% Progress`
+          });
+        });
+        interviews.slice(0, 1).forEach(m => {
+          list.push({
+            title: `Mock Interview: ${m.interview_type || 'Technical'}`,
+            time: new Date(m.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+            type: 'interview',
+            status: `Score: ${m.overall_score}%`
+          });
+        });
+        return list;
+      })()
     };
   }
 };

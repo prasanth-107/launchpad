@@ -77,6 +77,9 @@ def submit_assessment(req: SubmitAssessmentRequest):
     detailed_breakdown = []
     category_scores = {}
 
+    unanswered = sum(1 for q in questions if req.answers.get(q["id"]) is None)
+    correct_count = 0
+
     for q in questions:
         q_id = q["id"]
         user_answer = req.answers.get(q_id)
@@ -84,12 +87,14 @@ def submit_assessment(req: SubmitAssessmentRequest):
 
         if q.get("type") == "mcq":
             correct_idx = q.get("correctIndex")
-            if user_answer is not None and int(user_answer) == correct_idx:
+            if user_answer is not None and str(user_answer).isdigit() and int(user_answer) == correct_idx:
                 score += 1
+                correct_count += 1
                 is_correct = True
             detailed_breakdown.append({
                 "question_id": q_id,
                 "question": q["question"],
+                "options": q.get("options", []),
                 "user_answer": user_answer,
                 "correct_answer": correct_idx,
                 "is_correct": is_correct,
@@ -101,16 +106,22 @@ def submit_assessment(req: SubmitAssessmentRequest):
             code_str = str(user_answer or "")
             if len(code_str.strip()) > 30 and ("return" in code_str or "for" in code_str):
                 score += 1
+                correct_count += 1
                 is_correct = True
             detailed_breakdown.append({
                 "question_id": q_id,
                 "question": q["question"],
+                "options": [],
+                "user_answer": user_answer,
+                "correct_answer": "Valid algorithmic implementation",
                 "is_correct": is_correct,
                 "explanation": "Code successfully verified against automated test case inputs.",
                 "skill": q.get("skill", req.category)
             })
 
     percentage = int((score / max(1, total)) * 100)
+    passed = percentage >= 70
+    incorrect_count = total - correct_count - unanswered
     category_scores[req.category] = percentage
 
     # AI Gap Analysis
@@ -122,8 +133,13 @@ def submit_assessment(req: SubmitAssessmentRequest):
         "category": req.category,
         "score": score,
         "total": total,
+        "correct": correct_count,
+        "incorrect": incorrect_count,
+        "unanswered": unanswered,
         "percentage": percentage,
+        "passed": passed,
         "time_spent_seconds": req.time_spent_seconds,
+        "detailed_breakdown": detailed_breakdown,
         "analysis": ai_analysis
     }
     assessment_db.save_attempt(attempt_record)
@@ -135,7 +151,11 @@ def submit_assessment(req: SubmitAssessmentRequest):
         "success": True,
         "score": score,
         "total": total,
+        "correct": correct_count,
+        "incorrect": incorrect_count,
+        "unanswered": unanswered,
         "percentage": percentage,
+        "passed": passed,
         "category": req.category,
         "time_spent_seconds": req.time_spent_seconds,
         "detailed_breakdown": detailed_breakdown,

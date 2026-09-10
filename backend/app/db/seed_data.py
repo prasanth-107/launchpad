@@ -513,6 +513,22 @@ ASSESSMENT_QUESTIONS_SEED = [
         "difficulty": "Medium",
         "skill": "C++"
     },
+    {
+        "id": "cpp_2",
+        "category": "C++",
+        "type": "mcq",
+        "question": "What is the purpose of the 'virtual' keyword in a C++ base class destructor?",
+        "options": [
+            "To prevent the class from being instantiated",
+            "To ensure derived class destructors are called when deleting through a base pointer",
+            "To make all member variables read-only",
+            "To allow multiple inheritance"
+        ],
+        "correctIndex": 1,
+        "explanation": "A virtual destructor ensures that when an object of a derived class is deleted through a pointer to the base class, the derived destructor is invoked, preventing memory leaks.",
+        "difficulty": "Medium",
+        "skill": "C++"
+    },
     # Java
     {
         "id": "java_1",
@@ -541,6 +557,22 @@ ASSESSMENT_QUESTIONS_SEED = [
         "difficulty": "Easy",
         "skill": "Java"
     },
+    {
+        "id": "java_3",
+        "category": "Java",
+        "type": "mcq",
+        "question": "In Java Collections, what is the primary difference between ArrayList and LinkedList for element retrieval by index?",
+        "options": [
+            "ArrayList provides O(1) random access; LinkedList requires O(N) traversal",
+            "LinkedList provides O(1) random access; ArrayList requires O(N)",
+            "Both provide O(1) access",
+            "ArrayList cannot store null values"
+        ],
+        "correctIndex": 0,
+        "explanation": "ArrayList is backed by a contiguous array, allowing O(1) indexed lookup. LinkedList requires traversing nodes sequentially, taking O(N).",
+        "difficulty": "Medium",
+        "skill": "Java"
+    },
     # Python
     {
         "id": "py_1",
@@ -564,7 +596,34 @@ ASSESSMENT_QUESTIONS_SEED = [
         "difficulty": "Easy",
         "skill": "Python"
     },
-    # HTML & CSS & JavaScript
+    {
+        "id": "py_3",
+        "category": "Python",
+        "type": "mcq",
+        "question": "What is the average time complexity for key lookup in a standard Python dictionary?",
+        "options": ["O(1)", "O(log N)", "O(N)", "O(N log N)"],
+        "correctIndex": 0,
+        "explanation": "Python dictionaries are implemented as hash tables, providing O(1) average time complexity for insertions and lookups.",
+        "difficulty": "Easy",
+        "skill": "Python"
+    },
+    {
+        "id": "py_4",
+        "category": "Python",
+        "type": "mcq",
+        "question": "What does the `@staticmethod` decorator do in a Python class?",
+        "options": [
+            "Passes the class reference as cls to the method",
+            "Defines a method that does not receive an implicit first argument (self or cls)",
+            "Prevents the method from being overridden in derived classes",
+            "Caches the method return value in memory"
+        ],
+        "correctIndex": 1,
+        "explanation": "A static method does not receive an implicit first argument (neither self nor cls). It behaves like a plain function bound to the class namespace.",
+        "difficulty": "Medium",
+        "skill": "Python"
+    },
+    # HTML & CSS & JavaScript / Web Development
     {
         "id": "web_1",
         "category": "HTML",
@@ -598,7 +657,40 @@ ASSESSMENT_QUESTIONS_SEED = [
         "difficulty": "Easy",
         "skill": "JavaScript"
     },
-    # SQL
+    {
+        "id": "web_4",
+        "category": "JavaScript",
+        "type": "mcq",
+        "question": "In React 18+, which hook is specifically designed to perform side effects like data subscriptions or timers?",
+        "options": ["useMemo", "useCallback", "useEffect", "useRef"],
+        "correctIndex": 2,
+        "explanation": "useEffect is designed for synchronization and side effects such as data fetching, subscriptions, and DOM mutations.",
+        "difficulty": "Easy",
+        "skill": "React.js"
+    },
+    {
+        "id": "web_5",
+        "category": "JavaScript",
+        "type": "mcq",
+        "question": "In the JavaScript Event Loop, which queue takes priority and executes first before macrotasks?",
+        "options": ["Timer queue (setTimeout)", "Microtask queue (Promises)", "I/O polling queue", "Render queue"],
+        "correctIndex": 1,
+        "explanation": "Microtasks (Promise callbacks, queueMicrotask) are processed immediately after the current synchronous stack empties, before macrotasks like setTimeout.",
+        "difficulty": "Medium",
+        "skill": "JavaScript"
+    },
+    {
+        "id": "web_6",
+        "category": "JavaScript",
+        "type": "mcq",
+        "question": "What is the result of `['1', '2', '3'].map(parseInt)` in standard JavaScript?",
+        "options": ["[1, 2, 3]", "[1, NaN, NaN]", "[1, 0, 0]", "['1', '2', '3']"],
+        "correctIndex": 1,
+        "explanation": "map passes (element, index). parseInt('1', 0) -> 1, parseInt('2', 1) -> NaN (radix 1 is invalid), parseInt('3', 2) -> NaN ('3' is invalid in binary).",
+        "difficulty": "Hard",
+        "skill": "JavaScript"
+    },
+    # SQL & Relational Databases
     {
         "id": "sql_1",
         "category": "SQL",
@@ -621,7 +713,45 @@ ASSESSMENT_QUESTIONS_SEED = [
         "difficulty": "Easy",
         "skill": "SQL"
     },
-    # Data Structures
+    {
+        "id": "sql_3",
+        "category": "SQL",
+        "type": "mcq",
+        "question": "Which Normal Form requires that a table is in 2NF and contains no transitive functional dependencies?",
+        "options": ["1NF", "2NF", "3NF", "BCNF"],
+        "correctIndex": 2,
+        "explanation": "Third Normal Form (3NF) requires 2NF compliance and ensures that non-key attributes are not transitively dependent on the primary key.",
+        "difficulty": "Medium",
+        "skill": "Database"
+    },
+    {
+        "id": "sql_4",
+        "category": "SQL",
+        "type": "mcq",
+        "question": "What is the key difference between a Clustered Index and a Non-Clustered Index?",
+        "options": [
+            "A Clustered Index physically reorders the actual table rows on disk; a table can only have one",
+            "A table can have unlimited clustered indexes",
+            "Non-clustered indexes are stored inside the data pages",
+            "Clustered indexes are slower for range queries"
+        ],
+        "correctIndex": 0,
+        "explanation": "A Clustered Index defines the physical sorting order of data rows on disk. Consequently, each table can only have one clustered index.",
+        "difficulty": "Hard",
+        "skill": "Database"
+    },
+    {
+        "id": "sql_5",
+        "category": "SQL",
+        "type": "mcq",
+        "question": "In database transaction theory, which ACID property guarantees that all operations in a transaction succeed together or all are rolled back?",
+        "options": ["Atomicity", "Consistency", "Isolation", "Durability"],
+        "correctIndex": 0,
+        "explanation": "Atomicity ensures the 'all-or-nothing' principle of database transactions.",
+        "difficulty": "Easy",
+        "skill": "Database"
+    },
+    # Data Structures & Algorithms
     {
         "id": "dsa_1",
         "category": "Data Structures",
@@ -629,7 +759,7 @@ ASSESSMENT_QUESTIONS_SEED = [
         "question": "What is the worst-case time complexity of QuickSort when a naive pivot is chosen?",
         "options": ["O(N log N)", "O(N)", "O(N^2)", "O(log N)"],
         "correctIndex": 2,
-        "explanation": "If the array is already sorted and the last element is chosen as pivot, QuickSort degrades to O(N^2).",
+        "explanation": "If the array is already sorted and the last element is chosen as pivot, QuickSort partitions into sizes 0 and N-1, degrading to O(N^2).",
         "difficulty": "Medium",
         "skill": "Data Structures"
     },
@@ -643,6 +773,39 @@ ASSESSMENT_QUESTIONS_SEED = [
         "explanation": "A Stack operates on Last-In, First-Out (LIFO), where elements pushed last are popped first.",
         "difficulty": "Easy",
         "skill": "Data Structures"
+    },
+    {
+        "id": "dsa_3",
+        "category": "Data Structures",
+        "type": "mcq",
+        "question": "What is the average and worst-case time complexity to search for an element in a balanced Binary Search Tree (e.g., AVL or Red-Black Tree)?",
+        "options": ["O(1)", "O(log N)", "O(N)", "O(N log N)"],
+        "correctIndex": 1,
+        "explanation": "Balanced binary search trees maintain height bounded by O(log N), guaranteeing O(log N) search time even in the worst case.",
+        "difficulty": "Medium",
+        "skill": "Data Structures"
+    },
+    {
+        "id": "dsa_4",
+        "category": "Data Structures",
+        "type": "mcq",
+        "question": "Which graph traversal algorithm uses a Queue data structure and visits vertices level by level?",
+        "options": ["Depth-First Search (DFS)", "Breadth-First Search (BFS)", "Dijkstra's Algorithm", "Kruskal's Algorithm"],
+        "correctIndex": 1,
+        "explanation": "Breadth-First Search (BFS) explores neighboring vertices level by level using a First-In, First-Out (FIFO) queue.",
+        "difficulty": "Easy",
+        "skill": "Algorithms"
+    },
+    {
+        "id": "dsa_5",
+        "category": "Data Structures",
+        "type": "mcq",
+        "question": "What is the time complexity of building a Binary Heap from an arbitrary array of N elements using the bottom-up Heapify method?",
+        "options": ["O(N log N)", "O(N)", "O(log N)", "O(N^2)"],
+        "correctIndex": 1,
+        "explanation": "Building a heap bottom-up via heapify takes mathematical sum O(N), which is linear, not O(N log N).",
+        "difficulty": "Hard",
+        "skill": "Algorithms"
     },
     # Coding Problem
     {
@@ -681,6 +844,39 @@ ASSESSMENT_QUESTIONS_SEED = [
         "difficulty": "Easy",
         "skill": "Quantitative Aptitude"
     },
+    {
+        "id": "apt_q_3",
+        "category": "Quantitative Aptitude",
+        "type": "mcq",
+        "question": "Two trains of length 120m and 180m travel in opposite directions at 40 km/h and 50 km/h. How many seconds do they take to cross each other?",
+        "options": ["10 seconds", "12 seconds", "15 seconds", "18 seconds"],
+        "correctIndex": 1,
+        "explanation": "Total distance = 120 + 180 = 300m. Relative speed = 40 + 50 = 90 km/h = 90 * (5/18) = 25 m/s. Time = 300 / 25 = 12 seconds.",
+        "difficulty": "Medium",
+        "skill": "Quantitative Aptitude"
+    },
+    {
+        "id": "apt_q_4",
+        "category": "Quantitative Aptitude",
+        "type": "mcq",
+        "question": "In how many different ways can the letters of the word 'LEADER' be arranged?",
+        "options": ["720", "360", "120", "48"],
+        "correctIndex": 1,
+        "explanation": "Total letters = 6, with 'E' repeating 2 times. Arrangements = 6! / 2! = 720 / 2 = 360.",
+        "difficulty": "Medium",
+        "skill": "Quantitative Aptitude"
+    },
+    {
+        "id": "apt_q_5",
+        "category": "Quantitative Aptitude",
+        "type": "mcq",
+        "question": "A fair coin is tossed 3 times. What is the probability of getting at least two heads?",
+        "options": ["1/4", "3/8", "1/2", "5/8"],
+        "correctIndex": 2,
+        "explanation": "Total outcomes = 8. Outcomes with >= 2 heads: HHH, HHT, HTH, THH (4 outcomes). Probability = 4/8 = 1/2.",
+        "difficulty": "Easy",
+        "skill": "Quantitative Aptitude"
+    },
     # Logical Reasoning
     {
         "id": "apt_l_1",
@@ -691,6 +887,17 @@ ASSESSMENT_QUESTIONS_SEED = [
         "correctIndex": 2,
         "explanation": "The only son of Suresh's mother is Suresh himself. So the boy is the son of Suresh. Thus Suresh is his Father.",
         "difficulty": "Medium",
+        "skill": "Logical Reasoning"
+    },
+    {
+        "id": "apt_l_2",
+        "category": "Logical Reasoning",
+        "type": "mcq",
+        "question": "Find the missing number in the sequence: 2, 6, 12, 20, 30, ?",
+        "options": ["40", "42", "44", "48"],
+        "correctIndex": 1,
+        "explanation": "The differences between consecutive terms are 4, 6, 8, 10, 12... 30 + 12 = 42. (Also n * (n + 1)).",
+        "difficulty": "Easy",
         "skill": "Logical Reasoning"
     },
     # Verbal Ability
