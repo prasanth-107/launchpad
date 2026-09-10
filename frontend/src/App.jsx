@@ -286,7 +286,9 @@ export default function App() {
       {activeTab === 'roadmap' && (
         <RoadmapView
           user={user}
-          onRoadmapProgressUpdated={handleRoadmapProgressUpdated}
+          dashboardData={dashboardData}
+          onNavigate={(tab) => setActiveTab(tab)}
+          onRoadmapProgressUpdated={() => refreshDashboard(user?.id)}
           onNavigateToContent={(cat) => {
             setContentCategory(cat);
             setActiveTab('resources');
@@ -296,10 +298,12 @@ export default function App() {
 
       {activeTab === 'courses' && (
         <CoursesView
+          user={user}
           onNavigateToResources={(cat) => {
             setContentCategory(cat);
             setActiveTab('resources');
           }}
+          onCourseProgressUpdated={() => refreshDashboard(user?.id)}
         />
       )}
 

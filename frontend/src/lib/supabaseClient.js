@@ -7,6 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { computeSkillGaps } from './skillGapEngine';
 import { computePlacementReadiness } from './placementReadinessEngine';
+import { generatePersonalizedLearningPath } from './learningPathEngine';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -80,7 +81,9 @@ function initDefaultStore() {
       { id: 'c1', title: 'Full Stack Web Architecture with React & FastAPI', category: 'Web Development', instructor: 'Sarah Connor', duration_hours: 24, modules_count: 8, level: 'Intermediate' },
       { id: 'c2', title: 'Campus DSA Masterclass (Java & C++)', category: 'Data Structures', instructor: 'Dr. Arvind Sharma', duration_hours: 40, modules_count: 12, level: 'Advanced' },
       { id: 'c3', title: 'System Design for University Graduates', category: 'System Design', instructor: 'Alex Rivera', duration_hours: 18, modules_count: 6, level: 'Intermediate' },
-      { id: 'c4', title: 'Quantitative Aptitude & Logical Reasoning for Drives', category: 'Aptitude', instructor: 'Meera Kapoor', duration_hours: 15, modules_count: 5, level: 'Beginner' }
+      { id: 'c4', title: 'Quantitative Aptitude & Logical Reasoning for Drives', category: 'Aptitude', instructor: 'Meera Kapoor', duration_hours: 15, modules_count: 5, level: 'Beginner' },
+      { id: 'c5', title: 'Database Architecture & Advanced SQL Optimization', category: 'Database', instructor: 'Michael Vance', duration_hours: 16, modules_count: 6, level: 'Intermediate' },
+      { id: 'c6', title: 'Professional Interview Communication & STAR Method', category: 'Communication', instructor: 'Elena Rostova', duration_hours: 10, modules_count: 4, level: 'All Levels' }
     ],
     // 3. course_progress
     course_progress: [
@@ -379,30 +382,45 @@ export const dal = {
     },
 
     async updateProgress(userId, courseId, progressPercent, completedModules) {
+      if (!userId || !courseId) return null;
+      const cleanProgress = Math.min(100, Math.max(0, Math.round(progressPercent || 0)));
+      const status = cleanProgress >= 100 ? 'completed' : cleanProgress > 0 ? 'in_progress' : 'enrolled';
+      const modules = completedModules !== undefined ? completedModules : Math.round((cleanProgress / 100) * 8);
+
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('course_progress').upsert({
-          user_id: userId,
-          course_id: courseId,
-          progress_percent: progressPercent,
-          completed_modules: completedModules,
-          updated_at: new Date().toISOString()
-        }).select().single();
-        if (!error && data) return data;
+        try {
+          const { data, error } = await supabase.from('course_progress').upsert({
+            user_id: userId,
+            course_id: courseId,
+            progress_percent: cleanProgress,
+            completed_modules: modules,
+            status,
+            last_accessed: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,course_id' }).select().single();
+          if (!error && data) return data;
+        } catch (err) {
+          console.warn('Supabase course_progress update note:', err);
+        }
       }
       const store = getLocalStore();
+      store.course_progress = store.course_progress || [];
       let record = store.course_progress.find(p => p.user_id === userId && p.course_id === courseId);
       if (record) {
-        record.progress_percent = progressPercent;
-        record.completed_modules = completedModules;
+        record.progress_percent = cleanProgress;
+        record.completed_modules = modules;
+        record.status = status;
+        record.last_accessed = new Date().toISOString();
         record.updated_at = new Date().toISOString();
       } else {
         record = {
           id: 'cp-' + Date.now(),
           user_id: userId,
           course_id: courseId,
-          progress_percent: progressPercent,
-          completed_modules: completedModules,
-          status: 'in_progress',
+          progress_percent: cleanProgress,
+          completed_modules: modules,
+          status,
+          last_accessed: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
         store.course_progress.push(record);
@@ -748,24 +766,142 @@ export const dal = {
   // 8. Learning Paths (Entity 13)
   learningPaths: {
     async list(userId) {
+      if (!userId) return [];
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase.from('learning_paths').select('*').eq('user_id', userId).order('step_number', { ascending: true });
         if (!error && data?.length) return data;
       }
       const store = getLocalStore();
+      return (store.learning_paths || []).filter(p => p.user_id === userId);
+    },
+
+    async savePath(userId, stages) {
+      if (!userId || !stages || !stages.length) return [];
+      const rows = stages.map(s => ({
+        user_id: userId,
+        step_number: s.step_number,
+        title: s.title,
+        category: s.category,
+        description: s.description || '',
+        target_hours: s.target_hours || 10,
+        completed: Boolean(s.completed),
+        completed_at: s.completed ? (s.completed_at || new Date().toISOString()) : null
+      }));
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('learning_paths')
+            .upsert(rows, { onConflict: 'user_id,step_number' })
+            .select();
+          if (!error && data) return data;
+        } catch (err) {
+          console.warn('Supabase learning_paths upsert note:', err);
+        }
+      }
+
+      const store = getLocalStore();
+      store.learning_paths = store.learning_paths || [];
+      rows.forEach(r => {
+        const existingIdx = store.learning_paths.findIndex(
+          p => p.user_id === userId && p.step_number === r.step_number
+        );
+        if (existingIdx >= 0) {
+          store.learning_paths[existingIdx] = { ...store.learning_paths[existingIdx], ...r };
+        } else {
+          store.learning_paths.push({ id: 'lp-' + r.step_number + '-' + Date.now(), ...r });
+        }
+      });
+      saveLocalStore(store);
       return store.learning_paths.filter(p => p.user_id === userId);
     },
 
     async toggleStep(userId, stepNumber) {
+      if (!userId) return null;
+      let updatedState = null;
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: current } = await supabase
+            .from('learning_paths')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('step_number', stepNumber)
+            .single();
+
+          const newCompleted = current ? !current.completed : true;
+          const { data, error } = await supabase
+            .from('learning_paths')
+            .upsert({
+              user_id: userId,
+              step_number: stepNumber,
+              title: current?.title || `Stage ${stepNumber}`,
+              category: current?.category || 'General',
+              completed: newCompleted,
+              completed_at: newCompleted ? new Date().toISOString() : null
+            }, { onConflict: 'user_id,step_number' })
+            .select()
+            .single();
+
+          if (!error && data) updatedState = data;
+        } catch (err) {
+          console.warn('Supabase learning path toggle note:', err);
+        }
+      }
+
       const store = getLocalStore();
-      const step = store.learning_paths.find(p => p.user_id === userId && p.step_number === stepNumber);
+      store.learning_paths = store.learning_paths || [];
+      let step = store.learning_paths.find(p => p.user_id === userId && p.step_number === stepNumber);
       if (step) {
         step.completed = !step.completed;
         step.completed_at = step.completed ? new Date().toISOString() : null;
         saveLocalStore(store);
-        return step;
+        return updatedState || step;
+      } else {
+        const newStep = {
+          id: 'lp-' + stepNumber + '-' + Date.now(),
+          user_id: userId,
+          step_number: stepNumber,
+          title: `Milestone ${stepNumber}`,
+          category: 'Preparation',
+          completed: true,
+          completed_at: new Date().toISOString()
+        };
+        store.learning_paths.push(newStep);
+        saveLocalStore(store);
+        return updatedState || newStep;
       }
-      return null;
+    },
+
+    async getPersonalizedPath(userId) {
+      const attempts = await dal.assessments.getAttempts(userId);
+      const userSkills = await dal.skills.getUserSkills(userId);
+      const courses = await dal.courses.list();
+      const courseProgress = await dal.courses.getProgress(userId);
+      const learningPaths = await dal.learningPaths.list(userId);
+      const latestResume = await dal.resumes.getLatest(userId);
+      const interviews = await dal.interviews.list(userId);
+      const profile = await dal.profiles.get(userId);
+
+      const skillGapReport = computeSkillGaps(attempts, userSkills, courses);
+      const readinessReport = computePlacementReadiness({
+        attempts,
+        userSkills,
+        resumes: latestResume ? [latestResume] : [],
+        interviews,
+        progress: courseProgress,
+        profile
+      });
+
+      return generatePersonalizedLearningPath({
+        skillGapReport,
+        readinessReport,
+        courses,
+        courseProgress,
+        attempts,
+        userSkills,
+        existingLearningPaths: learningPaths
+      });
     }
   },
 
@@ -832,11 +968,27 @@ export const dal = {
     });
     const placementReadiness = readinessReport.score;
 
+    // Phase 4 Skill Gap Engine
+    const coursesList = (isSupabaseConfigured && supabase) ? await dal.courses.list() : (getLocalStore().courses || []);
+    const skillGapReport = computeSkillGaps(attempts, userSkills, coursesList);
+
+    // Phase 6 Personalized Learning Path & Adaptive Preparation Engine
+    const learningPathReport = generatePersonalizedLearningPath({
+      skillGapReport,
+      readinessReport,
+      courses: coursesList,
+      courseProgress: progress,
+      attempts,
+      userSkills,
+      existingLearningPaths: learningPaths
+    });
+
     return {
       profile,
       placementReadiness,
       readiness: readinessReport,
       readinessReport,
+      learningPathReport,
       stats: {
         testsCompleted: testsCompleted.toString(),
         questionsAttempted: questionsAttempted.toString(),
@@ -850,7 +1002,11 @@ export const dal = {
       },
       learningProgress: {
         trackRole: profile?.preferred_job_role || 'Full Stack Software Engineer',
-        overallPercent: avgCourseProgress,
+        overallPercent: learningPathReport.overallProgress,
+        currentCourse: learningPathReport.currentPriority?.recommendedCourse?.title || (coursesList[1]?.title || 'Campus DSA Masterclass (Java & C++)'),
+        nextCourse: learningPathReport.recommendedCourses?.[1]?.courseTitle || (coursesList[2]?.title || 'System Design for University Graduates'),
+        completedCourses: progress.filter(p => p.progress_percent >= 100 || p.status === 'completed').length,
+        nextBestAction: learningPathReport.nextBestAction,
         topics: [
           { name: 'HTML5 & Responsive Layouts', progress: 100, color: 'emerald' },
           { name: 'Modern JavaScript (ES6+)', progress: 84, color: 'indigo' },
@@ -859,23 +1015,16 @@ export const dal = {
           { name: 'Database Architecture (PostgreSQL/SQL)', progress: 54, color: 'amber' }
         ]
       },
-      skillGaps: (() => {
-        const courses = getLocalStore().courses || [];
-        const report = computeSkillGaps(attempts, userSkills, courses);
-        return report.domains.map(d => ({
-          name: d.name,
-          score: d.score,
-          target: d.targetScore,
-          gap: d.gapPercent,
-          color: d.classification.variant === 'success' ? 'emerald' : d.classification.variant === 'warning' ? 'amber' : 'rose',
-          status: d.classification.label,
-          recommendation: d.recommendation
-        }));
-      })(),
-      skillGapReport: (() => {
-        const courses = getLocalStore().courses || [];
-        return computeSkillGaps(attempts, userSkills, courses);
-      })(),
+      skillGaps: skillGapReport.domains.map(d => ({
+        name: d.name,
+        score: d.score,
+        target: d.targetScore,
+        gap: d.gapPercent,
+        color: d.classification.variant === 'success' ? 'emerald' : d.classification.variant === 'warning' ? 'amber' : 'rose',
+        status: d.classification.label,
+        recommendation: d.recommendation
+      })),
+      skillGapReport,
       recentActivities: (() => {
         const list = [];
         attempts.slice(0, 3).forEach(a => {

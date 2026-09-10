@@ -98,6 +98,16 @@ export default function DashboardView({ dashboardData, onNavigate }) {
   const biggestGap = skillGapReport?.biggestGap || null;
   const nextAction = skillGapReport?.recommendedNextAction || null;
 
+  // Phase 6 Personalized Learning Path & Adaptive Preparation
+  const learningPathReport = dashboardData?.learningPathReport || null;
+  const nextBestAction = learningPathReport?.nextBestAction || null;
+  const learningProgress = dashboardData?.learningProgress || {};
+  const currentCourse = learningProgress?.currentCourse || 'Campus DSA Masterclass (Java & C++)';
+  const nextCourse = learningProgress?.nextCourse || 'System Design for University Graduates';
+  const completedCoursesCount = learningProgress?.completedCourses ?? 0;
+  const overallLearningPercent = learningProgress?.overallPercent ?? (learningPathReport?.overallProgress || 0);
+  const hasLearningData = Boolean(learningPathReport?.hasPath);
+
   // AI Career Coach recommendations (Data-Grounded)
   const aiRecommendations = [
     {
@@ -239,6 +249,18 @@ export default function DashboardView({ dashboardData, onNavigate }) {
               Multi-dimensional composite evaluated across technical tests, aptitude rounds, resume ATS, and mock interviews against campus recruiting benchmarks.
             </p>
 
+            {hasReadiness && readinessReport?.priorityGap && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs">
+                <span className="text-slate-600">
+                  Priority Gap: <strong className="text-rose-600 font-bold">{readinessReport.priorityGap.name}</strong> ({readinessReport.priorityGap.score}% / Target: {readinessReport.priorityGap.targetBenchmark}%)
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-600">
+                  Recommended Action: <strong className="text-indigo-700 font-semibold">{readinessReport.nextAction?.text || 'Complete DSA Fundamentals'}</strong>
+                </span>
+              </div>
+            )}
+
             <div className="pt-2">
               <button
                 onClick={() => onNavigate(hasReadiness ? 'placement-readiness' : 'assessments')}
@@ -362,6 +384,51 @@ export default function DashboardView({ dashboardData, onNavigate }) {
         />
       </div>
 
+      {/* 3.5. Your Next Best Action Banner (Phase 6 Requirement) */}
+      <div className="saas-card p-5 sm:p-6 border-l-4 border-l-indigo-600 bg-gradient-to-r from-indigo-50/50 via-white to-white">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-bold uppercase tracking-wider text-indigo-700">
+                YOUR NEXT BEST ACTION
+              </span>
+              <Badge variant={hasLearningData ? 'primary' : 'neutral'} size="xs">
+                {hasLearningData ? 'Personalized Priority' : 'Action Required'}
+              </Badge>
+            </div>
+            
+            {hasLearningData && nextBestAction ? (
+              <div>
+                <h4 className="text-base font-bold text-slate-900 mt-1">
+                  "{nextBestAction.title}"
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {nextBestAction.desc}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h4 className="text-base font-bold text-slate-900 mt-1">
+                  Complete an Assessment to Generate Your Personalized Learning Path
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Take your first diagnostic assessment to evaluate skill gaps and unlock tailored preparation.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => onNavigate(hasLearningData ? (nextBestAction?.targetRoute || 'roadmap') : 'assessments')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            <span>{hasLearningData ? (nextBestAction?.actionLabel || 'Start Recommended Course') : 'Take Assessment'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
       {/* 4. Main 2-Column Desktop Grid: Learning Progress & Upcoming Assessments */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -374,12 +441,28 @@ export default function DashboardView({ dashboardData, onNavigate }) {
                 <p className="text-xs text-slate-500">Track: <strong>{profile?.preferred_job_role || 'Full Stack Software Engineer'}</strong></p>
               </div>
               <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
-                68% complete
+                {overallLearningPercent}% complete
               </span>
             </div>
 
+            {/* Course Telemetry Badges (Current, Next, Completed) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-3 border-b border-slate-100 text-xs">
+              <div className="p-2 rounded-lg bg-slate-50">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Course</span>
+                <span className="font-bold text-slate-800 truncate block mt-0.5" title={currentCourse}>{currentCourse}</span>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-50">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Next Course</span>
+                <span className="font-bold text-slate-800 truncate block mt-0.5" title={nextCourse}>{nextCourse}</span>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-50">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Completed</span>
+                <span className="font-bold text-emerald-600 block mt-0.5">{completedCoursesCount} Cleared</span>
+              </div>
+            </div>
+
             {/* Course Progress Bars */}
-            <div className="space-y-3.5 my-5">
+            <div className="space-y-3.5 my-4">
               {learningTopics.map((topic) => (
                 <div key={topic.name}>
                   <div className="flex items-center justify-between text-xs mb-1">
@@ -396,9 +479,9 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs text-slate-500">Next module: <strong>FastAPI Async Endpoints & Pydantic</strong></span>
+            <span className="text-xs text-slate-500">Next milestone: <strong className="text-slate-700">{nextCourse}</strong></span>
             <button
-              onClick={() => onNavigate('courses')}
+              onClick={() => onNavigate('roadmap')}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <span>Continue Learning</span>
