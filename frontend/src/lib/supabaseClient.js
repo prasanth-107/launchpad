@@ -119,35 +119,8 @@ function initDefaultStore() {
     user_skills: [],
     // 8. resumes (starts empty; populated when candidate uploads and scans real resume)
     resumes: [],
-    // 9. mock_interviews (8 completed sessions)
-    mock_interviews: [
-      {
-        id: 'mi-1',
-        user_id: demoUserId,
-        interview_type: 'Technical (Full Stack)',
-        target_role: 'Full Stack Software Engineer',
-        overall_score: 82,
-        communication_score: 80,
-        relevance_score: 85,
-        confidence_score: 78,
-        technical_score: 84,
-        ai_feedback: 'Demonstrated solid grasp of React hooks lifecycle and SQL isolation levels. Continue practicing dynamic programming under time constraints.',
-        created_at: new Date(Date.now() - 3 * 86400000).toISOString()
-      },
-      {
-        id: 'mi-2',
-        user_id: demoUserId,
-        interview_type: 'HR & Behavioral',
-        target_role: 'SDE-1',
-        overall_score: 76,
-        communication_score: 75,
-        relevance_score: 80,
-        confidence_score: 72,
-        technical_score: 77,
-        ai_feedback: 'Good STAR framing for conflict resolution question. Keep introductory summary within 90 seconds.',
-        created_at: new Date(Date.now() - 7 * 86400000).toISOString()
-      }
-    ],
+    // 9. mock_interviews (starts empty; populated only when candidate completes real mock interviews)
+    mock_interviews: [],
     // 10. learning_paths (8 canonical placement roadmap milestones)
     learning_paths: [
       { id: 'lp-1', user_id: demoUserId, step_number: 1, title: 'Python & Problem Solving', category: 'Programming', target_hours: 15, completed: true },
@@ -761,38 +734,51 @@ export const dal = {
   // 7. Mock Interviews (Entity 12)
   interviews: {
     async list(userId) {
+      if (!userId) return [];
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('mock_interviews').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        const { data, error } = await supabase
+          .from('mock_interviews')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
         if (!error && data) return data;
       }
       const store = getLocalStore();
-      return store.mock_interviews.filter(m => m.user_id === userId);
+      return (store.mock_interviews || []).filter(m => m.user_id === userId);
     },
 
     async save(userId, interviewData) {
-      const record = {
-        id: 'mi-' + Date.now(),
+      if (!userId) throw new Error('User ID is required to save interview session');
+
+      const payload = {
         user_id: userId,
-        interview_type: interviewData.interview_type || 'Technical',
-        target_role: interviewData.target_role || 'Full Stack Software Engineer',
-        overall_score: interviewData.overall_score || 78,
-        communication_score: interviewData.communication_score || 75,
-        relevance_score: interviewData.relevance_score || 80,
-        confidence_score: interviewData.confidence_score || 70,
-        technical_score: interviewData.technical_score || 82,
-        ai_feedback: interviewData.ai_feedback || 'Well-structured answers with clear technical examples.',
+        interview_type: interviewData.interview_type || interviewData.interviewType || 'Technical Interview',
+        target_role: interviewData.target_role || interviewData.targetRole || 'Full Stack Software Engineer',
+        overall_score: Math.round(Number(interviewData.overall_score ?? interviewData.overallScore ?? 0)),
+        communication_score: Math.round(Number(interviewData.communication_score ?? interviewData.communicationScore ?? 0)),
+        relevance_score: Math.round(Number(interviewData.relevance_score ?? interviewData.relevanceScore ?? 0)),
+        confidence_score: Math.round(Number(interviewData.confidence_score ?? interviewData.confidenceScore ?? 0)),
+        technical_score: Math.round(Number(interviewData.technical_score ?? interviewData.technicalScore ?? 0)),
+        transcript: interviewData.transcript || interviewData.exchanges || [],
+        ai_feedback: interviewData.ai_feedback || interviewData.feedback || interviewData.statusDescription || 'Interview evaluation completed.',
         created_at: new Date().toISOString()
       };
 
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.from('mock_interviews').insert(record).select().single();
+        const { data, error } = await supabase.from('mock_interviews').insert(payload).select().single();
         if (!error && data) return data;
+        console.warn('Supabase mock_interviews insert notice:', error?.message);
       }
 
       const store = getLocalStore();
-      store.mock_interviews.unshift(record);
+      const localRecord = {
+        id: 'mi-' + Date.now(),
+        ...payload
+      };
+      if (!store.mock_interviews) store.mock_interviews = [];
+      store.mock_interviews.unshift(localRecord);
       saveLocalStore(store);
-      return record;
+      return localRecord;
     }
   },
 
@@ -1022,6 +1008,11 @@ export const dal = {
       readiness: readinessReport,
       readinessReport,
       learningPathReport,
+      resumes: allResumes,
+      latestResume,
+      interviews,
+      mock_interviews: interviews,
+      latestInterview: interviews[0] || null,
       stats: {
         testsCompleted: testsCompleted.toString(),
         questionsAttempted: questionsAttempted.toString(),

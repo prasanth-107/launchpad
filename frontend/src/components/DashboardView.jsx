@@ -72,6 +72,23 @@ export default function DashboardView({ dashboardData, onNavigate }) {
     }
   }
 
+  // Real Mock Interview Card state (never fabricated)
+  const latestInterview = dashboardData?.latestInterview || dashboardData?.mock_interviews?.[0] || dashboardData?.interviews?.[0] || null;
+  const hasInterview = Boolean(latestInterview && (latestInterview.overall_score !== undefined || latestInterview.overallScore !== undefined));
+  const interviewScore = hasInterview ? Number(latestInterview.overall_score ?? latestInterview.overallScore) : null;
+
+  let interviewStatusTier = 'Needs Improvement';
+  if (interviewScore >= 75) {
+    interviewStatusTier = 'Strong';
+  } else if (interviewScore >= 60) {
+    interviewStatusTier = 'Good';
+  }
+
+  let interviewFeedback = 'Complete an AI mock interview simulation to test your technical articulation and communication.';
+  if (hasInterview) {
+    interviewFeedback = latestInterview.ai_feedback || latestInterview.feedback || `Last completed round: ${latestInterview.interview_type || 'Technical Interview'}`;
+  }
+
   // 7 Core Dimensions for Placement Readiness from Centralized Engine (Zero Hardcoded values)
   const readinessDimensions = (readinessReport?.pillars || [
     { id: 'tech', shortName: 'Technical Skills', baseWeight: 20, targetBenchmark: 80, color: 'indigo' },
@@ -621,6 +638,58 @@ export default function DashboardView({ dashboardData, onNavigate }) {
               <>Resume Status: <strong className={atsScore >= 85 ? 'text-emerald-600' : (atsScore >= 65 ? 'text-amber-600' : 'text-rose-600')}>{resumeStatusTier}</strong></>
             ) : (
               'Upload your resume to receive ATS analysis.'
+            )}
+          </span>
+        </div>
+      </div>
+
+      {/* Dedicated AI MOCK INTERVIEW Console Card (Phase 8) */}
+      <div className="saas-card p-6 border-indigo-100/80 bg-linear-to-r from-white via-slate-50/40 to-purple-50/20 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center shrink-0 shadow-2xs">
+              <Mic2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">MOCK INTERVIEW</h3>
+                <Badge variant={hasInterview ? (interviewScore >= 75 ? 'success' : (interviewScore >= 60 ? 'warning' : 'danger')) : 'neutral'} size="xs">
+                  {hasInterview ? interviewStatusTier : 'Not Evaluated'}
+                </Badge>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  {hasInterview ? `${interviewScore}` : '—'}
+                </span>
+                <span className="text-slate-400 text-sm font-bold">/ 100</span>
+                {hasInterview && (
+                  <span className="text-xs text-slate-500 font-medium ml-2">
+                    • 15% Weight in Placement Readiness
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onNavigate('interview')}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer self-start sm:self-auto inline-flex items-center gap-1.5"
+          >
+            <span>{hasInterview ? 'Retake Interview' : 'Start Mock Interview'}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-start gap-2 text-slate-600">
+            <span className="font-semibold text-slate-700 shrink-0">Interviewer Insights:</span>
+            <span className="text-slate-600 line-clamp-1">{interviewFeedback}</span>
+          </div>
+          <span className="text-[11px] text-slate-400 shrink-0">
+            {hasInterview ? (
+              <>Interview Status: <strong className={interviewScore >= 75 ? 'text-emerald-600' : (interviewScore >= 60 ? 'text-amber-600' : 'text-rose-600')}>{interviewStatusTier}</strong> ({latestInterview.target_role || latestInterview.targetRole || 'Full Stack'})</>
+            ) : (
+              'No completed mock interviews yet.'
             )}
           </span>
         </div>

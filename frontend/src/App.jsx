@@ -204,14 +204,16 @@ export default function App() {
     refreshDashboard(user.id);
   };
 
-  const handleInterviewCompleted = async (updatedReadiness) => {
-    await dal.interviews.save(user.id, {
-      overall_score: updatedReadiness.overall_score || 80,
-      interview_type: updatedReadiness.type || 'Technical',
-      ai_feedback: updatedReadiness.feedback || 'Evaluated successfully'
-    });
-    showNotification(`Mock interview saved to Supabase! Readiness score updated.`);
-    refreshDashboard(user.id);
+  const handleInterviewCompleted = async (sessionData) => {
+    if (sessionData && !sessionData._alreadySaved && user?.id) {
+      await dal.interviews.save(user.id, sessionData);
+    }
+    const score = sessionData?.overall_score ?? sessionData?.overallScore;
+    const scoreText = score !== undefined && score !== null ? ` Score: ${score}/100.` : '';
+    showNotification(`Mock interview saved to Supabase!${scoreText} Placement Readiness updated.`);
+    if (user?.id) {
+      refreshDashboard(user.id);
+    }
   };
 
   const handleResumeAnalyzed = async (resumeData) => {
@@ -326,7 +328,9 @@ export default function App() {
       {(activeTab === 'interview' || activeTab === 'interview-history') && (
         <MockInterviewView
           user={user}
+          initialTab={activeTab === 'interview-history' ? 'history' : 'simulate'}
           onInterviewCompleted={handleInterviewCompleted}
+          onNavigate={handleNavigate}
         />
       )}
 
