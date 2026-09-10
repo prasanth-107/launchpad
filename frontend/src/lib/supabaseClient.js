@@ -21,6 +21,17 @@ import {
   getUpcomingApplicationEvent
 } from './applicationPipelineEngine.js';
 import { buildCareerCoachContext } from './careerCoachEngine.js';
+import {
+  computeProgressOverview,
+  computePillarProgress,
+  analyzeReadinessTrend,
+  aggregateActivityTimeline,
+  analyzeSkillProgress,
+  analyzeLearningProgress,
+  analyzeAssessmentHistory,
+  analyzeApplicationPipeline,
+  generateReadinessInsights
+} from './progressAnalyticsEngine.js';
 
 const rawUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const rawKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -64,6 +75,7 @@ function getLocalStore() {
       if (!parsed.applications) parsed.applications = parsed.tracked_applications || [];
       if (!parsed.coach_sessions) parsed.coach_sessions = [];
       if (!parsed.coach_messages) parsed.coach_messages = [];
+      if (!parsed.readiness_snapshots) parsed.readiness_snapshots = [];
       return parsed;
     }
   } catch (e) {
@@ -184,7 +196,9 @@ function initDefaultStore() {
     // 13. saved_jobs (user-scoped saved placement drives)
     saved_jobs: [],
     // 14. tracked_applications (user-scoped application tracking clicks)
-    tracked_applications: []
+    tracked_applications: [],
+    // 15. readiness_snapshots (Entity 18 historical readiness audits)
+    readiness_snapshots: []
   };
 
   saveLocalStore(initialStore);
@@ -1562,6 +1576,170 @@ export const dal = {
         applications,
         context_generated_at: new Date().toISOString()
       });
+    }
+  },
+
+  // 13. Placement Progress Analytics & Intelligence DAL
+  analytics: {
+    async getSnapshots(userId) {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('readiness_snapshots')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+        if (!error && data) return data;
+      }
+      const store = loadLocalStore();
+      return (store.readiness_snapshots || [])
+        .filter(s => s.user_id === userId)
+        .sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    },
+
+    async saveSnapshot(userId, snapshotData) {
+      const existing = await this.getSnapshots(userId);
+      const latest = existing.length > 0 ? existing[existing.length - 1] : null;
+
+      // Duplicate prevention: if score and pillars count match latest snapshot within 24h, skip
+      if (latest && 
+          Number(latest.readiness_score) === Number(snapshotData.readiness_score) &&
+          Number(latest.evaluated_pillars) === Number(snapshotData.evaluated_pillars)) {
+        const diffHours = (Date.now() - new Date(latest.created_at).getTime()) / (1000 * 60 * 60);
+        if (diffHours < 24) {
+          return latest;
+        }
+      }
+
+      const newSnapshot = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `snap-${Date.now()}`,
+        user_id: userId,
+        readiness_score: Number(snapshotData.readiness_score) || 0,
+        evaluated_pillars: Number(snapshotData.evaluated_pillars) || 0,
+        strongest_area: snapshotData.strongest_area || null,
+        priority_gap: snapshotData.priority_gap || null,
+        pillar_breakdown: snapshotData.pillar_breakdown || null,
+        created_at: snapshotData.created_at || new Date().toISOString()
+      };
+
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('readiness_snapshots')
+          .insert([newSnapshot])
+          .select()
+          .single();
+        if (!error && data) return data;
+      }
+
+      const store = loadLocalStore();
+      if (!store.readiness_snapshots) store.readiness_snapshots = [];
+      store.readiness_snapshots.push(newSnapshot);
+      saveLocalStore(store);
+      return newSnapshot;
+    },
+
+    async getAnalyticsData(userId, period = 'all') {
+      const [
+        profile,
+        attempts,
+        userSkills,
+        courses,
+        courseProgress,
+        learningPaths,
+        resumes,
+        interviews,
+        applications,
+        snapshots
+      ] = await Promise.all([
+        dal.profiles.get(userId),
+        dal.assessments.getAttempts(userId),
+        dal.skills.getUserSkills(userId),
+        dal.courses.getAll(),
+        dal.courses.getProgress(userId),
+        dal.learningPaths.get(userId),
+        dal.resumes.list(userId),
+        dal.interviews.list(userId),
+        dal.applications.list(userId),
+        this.getSnapshots(userId)
+      ]);
+
+      // Calculate real centralized Placement Readiness
+      const readinessReport = dal.calculateReadinessIndex({
+        attempts,
+        userSkills,
+        resumes,
+        interviews,
+        courseProgress
+      });
+
+      // Auto-record snapshot if candidate has evaluated data
+      if (readinessReport?.score !== null && readinessReport?.score !== undefined) {
+        try {
+          await this.saveSnapshot(userId, {
+            readiness_score: readinessReport.score,
+            evaluated_pillars: readinessReport.pillars ? readinessReport.pillars.filter(p => p.available).length : 0,
+            strongest_area: readinessReport.strongestArea?.name || null,
+            priority_gap: readinessReport.priorityGap?.name || null,
+            pillar_breakdown: readinessReport.pillars
+          });
+        } catch (e) {
+          // Non-blocking snapshot recording
+        }
+      }
+
+      // Re-fetch snapshots in case a new one was recorded
+      const freshSnapshots = await this.getSnapshots(userId);
+
+      const overview = computeProgressOverview({
+        readinessReport,
+        learningPaths,
+        courses,
+        courseProgress,
+        attempts,
+        userSkills,
+        resumes,
+        interviews,
+        applications
+      });
+
+      const pillarProgress = computePillarProgress(readinessReport);
+      const readinessTrend = analyzeReadinessTrend(freshSnapshots, period);
+      const activityTimeline = aggregateActivityTimeline({
+        attempts,
+        courseProgress,
+        learningPaths,
+        resumes,
+        interviews,
+        applications,
+        userSkills,
+        period
+      });
+      const skillProgress = analyzeSkillProgress(userSkills, attempts);
+      const learningProgress = analyzeLearningProgress(learningPaths, courses, courseProgress);
+      const assessmentAnalytics = analyzeAssessmentHistory(attempts, period);
+      const applicationPipeline = analyzeApplicationPipeline(applications);
+      const insights = generateReadinessInsights({
+        readinessReport,
+        skillGaps: skillProgress,
+        resume: overview.resume,
+        mockInterview: overview.mockInterview,
+        applications
+      });
+
+      return {
+        userId,
+        profile,
+        period,
+        readinessReport,
+        overview,
+        pillarProgress,
+        readinessTrend,
+        activityTimeline,
+        skillProgress,
+        learningProgress,
+        assessmentAnalytics,
+        applicationPipeline,
+        insights
+      };
     }
   }
 };

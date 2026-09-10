@@ -32,8 +32,10 @@ export default function TopNavbar({
       case 'coach':
       case 'placement-copilot':
       case 'ai-career-coach':
-        return 'AI Career Coach';
-      case 'overall-report': return 'Overall Report';
+      case 'analytics':
+      case 'overall-report':
+      case 'progress':
+        return 'Placement Progress & Analytics';
       case 'placement-readiness': return 'Placement Readiness';
       case 'roadmap': return 'Learning Paths';
       case 'courses': return 'Course Catalog';
@@ -94,6 +96,7 @@ export default function TopNavbar({
               if (e.key === 'Enter' && onNavigate) {
                 const val = e.currentTarget.value.toLowerCase();
                 if (val.includes('coach') || val.includes('copilot') || val.includes('ai career')) onNavigate('career-coach');
+                else if (val.includes('analytic') || val.includes('progress') || val.includes('report')) onNavigate('analytics');
                 else if (val.includes('drive') || val.includes('job')) onNavigate('job-opportunities');
                 else if (val.includes('test') || val.includes('assess')) onNavigate('assessments');
                 else if (val.includes('resume') || val.includes('ats')) onNavigate('resume');

@@ -32,7 +32,7 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
         { id: 'career-coach', label: 'AI Career Coach', icon: Bot },
         { id: 'skill-gap', label: 'Skill Gap Analysis', icon: Target },
         { id: 'placement-readiness', label: 'Placement Readiness', icon: Sparkles },
-        { id: 'overall-report', label: 'Overall Report', icon: BarChart3 },
+        { id: 'analytics', label: 'Placement Analytics', icon: BarChart3 },
       ]
     },
     {
@@ -116,7 +116,9 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeTab === item.id || (item.id === 'career-coach' && (activeTab === 'coach' || activeTab === 'placement-copilot' || activeTab === 'ai-career-coach'));
+                    const isActive = activeTab === item.id || 
+                      (item.id === 'career-coach' && (activeTab === 'coach' || activeTab === 'placement-copilot' || activeTab === 'ai-career-coach')) ||
+                      (item.id === 'analytics' && (activeTab === 'overall-report' || activeTab === 'progress'));
                     return (
                       <button
                         key={item.id}

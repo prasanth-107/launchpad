@@ -24,7 +24,8 @@ import {
   MapPin,
   DollarSign,
   Layers,
-  Bot
+  Bot,
+  BarChart3
 } from 'lucide-react';
 import { StatCard } from './ui/StatCard';
 import { ProgressBar } from './ui/ProgressBar';
@@ -270,6 +271,41 @@ export default function DashboardView({ dashboardData, onNavigate }) {
         </button>
       </div>
 
+      {/* 1C. PLACEMENT PROGRESS Widget (Phase 12 Progress Intelligence) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 text-indigo-600">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">PLACEMENT PROGRESS</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Live Telemetry
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs font-medium text-slate-700">
+              <span>Readiness: <strong className="text-slate-900">{hasReadiness ? `${readinessScore}/100` : 'Evaluating'}</strong></span>
+              <span>•</span>
+              <span>Roadmap: <strong className="text-slate-900">{dashboardData?.learningProgress?.progressPercent !== undefined ? `${dashboardData.learningProgress.progressPercent}%` : (dashboardData?.learningPaths?.length > 0 ? `${Math.round((dashboardData.learningPaths.filter(lp => lp.completed).length / dashboardData.learningPaths.length) * 100)}%` : 'In Progress')}</strong></span>
+              {readinessReport?.priorityGap && (
+                <>
+                  <span>•</span>
+                  <span>Priority Gap: <strong className="text-amber-700">{readinessReport.priorityGap.name}</strong></span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => onNavigate('analytics')}
+          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
+        >
+          <span>View Full Analytics</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       {/* 2. Primary Metric Hero Card: PLACEMENT READINESS (7 Dimensions) */}
       <div className="saas-card p-6 sm:p-7">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
@@ -443,7 +479,7 @@ export default function DashboardView({ dashboardData, onNavigate }) {
           trend="Active Streak 🔥"
           trendType="warning"
           subtitle="Keep daily consistency"
-          onClick={() => onNavigate('overall-report')}
+          onClick={() => onNavigate('analytics')}
         />
       </div>
 

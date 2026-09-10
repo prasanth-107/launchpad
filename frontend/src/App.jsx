@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell } from './components/ui/AppShell';
 import DashboardView from './components/DashboardView';
+import AnalyticsView from './components/AnalyticsView';
 import OverallReportView from './components/OverallReportView';
 import PlacementReadinessView from './components/PlacementReadinessView';
 import RoadmapView from './components/RoadmapView';
@@ -282,9 +283,10 @@ export default function App() {
         />
       )}
 
-      {activeTab === 'overall-report' && (
-        <OverallReportView
-          dashboardData={dashboardData}
+      {(activeTab === 'analytics' || activeTab === 'overall-report' || activeTab === 'progress') && (
+        <AnalyticsView
+          user={user}
+          onNavigate={handleNavigate}
         />
       )}
 
