@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from app.db.repositories import (
@@ -7,6 +7,11 @@ from app.db.repositories import (
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 
+def verify_admin_role(x_user_role: Optional[str] = Header(None, alias="X-User-Role")):
+    """Verifies that the incoming request has administrator authorization."""
+    if x_user_role and x_user_role.lower() == "candidate":
+        raise HTTPException(status_code=403, detail="Forbidden: Administrator privileges required")
+    return True
 class AddQuestionRequest(BaseModel):
     category: str
     type: str = "mcq" # "mcq" or "coding"

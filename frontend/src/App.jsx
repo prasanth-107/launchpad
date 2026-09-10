@@ -18,6 +18,7 @@ import ApplicationTrackingView from './components/ApplicationTrackingView';
 import SkillsCertificatesView from './components/SkillsCertificatesView';
 import ProfileSettingsView from './components/ProfileSettingsView';
 import { CareerCoachView } from './components/CareerCoachView';
+import AdminPanelView from './components/AdminPanelView';
 import AuthView from './components/AuthView';
 import AuthModal from './components/AuthModal';
 import { apiClient } from './api/client';
@@ -422,6 +423,17 @@ export default function App() {
             showNotification('Settings updated successfully!');
           }}
           initialTab="settings"
+        />
+      )}
+
+      {(activeTab === 'admin' || activeTab === 'command-center') && (
+        <AdminPanelView
+          user={user}
+          onNavigate={handleNavigate}
+          onSwitchRole={(newRole) => {
+            setUser(prev => ({ ...prev, role: newRole }));
+            showNotification(`Switched role to ${newRole}`);
+          }}
         />
       )}
 

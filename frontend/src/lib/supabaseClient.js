@@ -1,3 +1,13 @@
+import {
+  verifyAdminAccess,
+  aggregateReadinessMetrics,
+  aggregateSkillGaps,
+  aggregateApplicationPipeline,
+  aggregateOpportunityIntelligence,
+  filterAndSearchStudents,
+  buildStudentPlacementDossier,
+  generateSafeExportCsv
+} from './adminCommandCenterEngine';
 import { generatePlacementStrategy, determineStudentReadinessStage, STUDENT_READINESS_STAGES } from './studentSuccessEngine.js';
 import {
   selectAdaptiveQuestions,
@@ -2256,6 +2266,119 @@ export const dal = {
       };
 
       return generatePlacementStrategy(candidateContext);
+    }
+  },
+
+  // 20. Placement Command Center & Admin Intelligence (Phase 18)
+  admin: {
+    async verifyAdmin(userId) {
+      if (!userId) return { authorized: false, role: 'anonymous' };
+      const profile = await dal.profiles.get(userId);
+      return verifyAdminAccess(profile);
+    },
+
+    async getCommandCenterOverview(adminUserId) {
+      // 1. Verify admin privilege
+      const auth = await dal.admin.verifyAdmin(adminUserId);
+      if (!auth.authorized) {
+        throw new Error('Unauthorized: Placement Command Center requires administrator credentials');
+      }
+
+      // 2. Fetch cohort data from database
+      const [profiles, userSkills, attempts, applications] = await Promise.all([
+        dal.profiles.getAll ? dal.profiles.getAll() : Promise.resolve([]),
+        supabase.from('user_skills').select('*').then(r => r.data || []),
+        supabase.from('assessment_attempts').select('*').then(r => r.data || []),
+        supabase.from('job_applications').select('*').then(r => r.data || [])
+      ]);
+
+      // Calculate individual readiness for each student
+      const studentsWithReadiness = profiles.map(p => {
+        const pAttempts = attempts.filter(a => a.user_id === p.id);
+        const pSkills = userSkills.filter(s => s.user_id === p.id);
+        const pApps = applications.filter(a => a.user_id === p.id);
+        const hasEvaluations = pAttempts.length > 0 || pSkills.length > 0;
+        
+        let score = null;
+        if (hasEvaluations) {
+          const report = computePlacementReadiness({
+            attempts: pAttempts,
+            userSkills: pSkills,
+            resumes: [],
+            interviews: [],
+            progress: [],
+            profile: p
+          });
+          score = report?.readinessScore ?? null;
+        }
+
+        return {
+          ...p,
+          readinessScore: score,
+          activeApplicationsCount: pApps.filter(a => ['applied', 'assessment', 'interview', 'offer'].includes(a.status)).length,
+          placed: pApps.some(a => a.status === 'selected')
+        };
+      });
+
+      const readinessMetrics = aggregateReadinessMetrics(studentsWithReadiness);
+      const skillGaps = aggregateSkillGaps(userSkills);
+      const pipelineMetrics = aggregateApplicationPipeline(applications);
+      const opportunityMetrics = aggregateOpportunityIntelligence(PLACEMENT_OPPORTUNITIES_CATALOG, applications);
+
+      return {
+        readinessMetrics,
+        skillGaps,
+        pipelineMetrics,
+        opportunityMetrics,
+        students: studentsWithReadiness
+      };
+    },
+
+    async searchStudents(adminUserId, filters = {}) {
+      const auth = await dal.admin.verifyAdmin(adminUserId);
+      if (!auth.authorized) {
+        throw new Error('Unauthorized: Student directory search requires administrator credentials');
+      }
+      const overview = await dal.admin.getCommandCenterOverview(adminUserId);
+      return filterAndSearchStudents(overview.students, filters);
+    },
+
+    async getStudentDossier(adminUserId, targetStudentId) {
+      const auth = await dal.admin.verifyAdmin(adminUserId);
+      if (!auth.authorized) {
+        throw new Error('Unauthorized: Student dossier inspection requires administrator credentials');
+      }
+
+      const [profile, skills, attempts, interviews, resumes, applications] = await Promise.all([
+        dal.profiles.get(targetStudentId),
+        dal.user_skills.getByUser(targetStudentId),
+        dal.assessment_attempts.getByUser(targetStudentId),
+        dal.mock_interviews.getByUser(targetStudentId),
+        dal.resumes.getByUser(targetStudentId),
+        dal.applications.getAll(targetStudentId)
+      ]);
+
+      const readinessReport = computePlacementReadiness({
+        attempts,
+        userSkills: skills,
+        resumes,
+        interviews,
+        progress: [],
+        profile
+      });
+
+      return buildStudentPlacementDossier(profile, {
+        attempts,
+        skills,
+        interviews,
+        resumes,
+        applications,
+        readinessReport
+      });
+    },
+
+    exportPlacementData(students) {
+      return generateSafeExportCsv(students);
     }
   }
 };

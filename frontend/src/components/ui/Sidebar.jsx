@@ -22,7 +22,8 @@ import {
   ChevronRight,
   Layers,
   Bot,
-  Brain
+  Brain,
+  ShieldCheck
 } from 'lucide-react';
 
 export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClose }) {
@@ -64,6 +65,12 @@ export function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpen, onClo
         { id: 'applications', label: 'Application Pipeline', icon: Layers },
         { id: 'skills', label: 'Skills & Endorsements', icon: Sparkles },
         { id: 'certificates', label: 'Certificates', icon: Award },
+      ]
+    },
+    {
+      title: 'INSTITUTION',
+      items: [
+        { id: 'admin', label: 'Command Center', icon: ShieldCheck },
       ]
     },
     {
