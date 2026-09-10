@@ -1,10 +1,17 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from app.core.config import settings
 from app.routers import (
     auth, profile, dashboard, assessments, roadmap,
     content, youtube, interview, resume, recommendations, admin, coach
 )
+import datetime
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("placement_launchpad")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -20,6 +27,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Safe Exception Handler (Zero stack trace leakage in production)
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An internal server error occurred. Please try again later.",
+            "code": "INTERNAL_SERVER_ERROR"
+        }
+    )
+
+# Structured Request Validation Handler
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Invalid request payload or parameters.",
+            "code": "VALIDATION_ERROR",
+            "errors": [{"field": ".".join(str(loc) for loc in err.get("loc", [])), "message": err.get("msg")} for err in exc.errors()]
+        }
+    )
 
 # Mount all domain routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
@@ -43,7 +74,8 @@ def health_check():
         "version": settings.VERSION,
         "database_layer": "separated_modular_repositories",
         "ai_engine": "ready",
-        "youtube_service": "ready"
+        "youtube_service": "ready",
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
     }
 
 @app.get("/")

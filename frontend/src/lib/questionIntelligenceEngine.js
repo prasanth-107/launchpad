@@ -136,7 +136,7 @@ export function sanitizeUntrustedText(text, maxLength = 500) {
   let cleaned = text
     .replace(/<[^>]*>/g, '') // Strip HTML tags
     .replace(/\\r\\n|\\r|\\n/g, ' ')
-    .replace(/[\\x00-\\x1F\\x7F]/g, '') // Strip control characters
+    .replace(/[\x00-\x1F\x7F]/g, '') // Strip control characters
     .trim();
 
   // Defense against prompt injection patterns

@@ -1,26 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AppShell } from './components/ui/AppShell';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import DashboardView from './components/DashboardView';
-import PreparationWorkspaceView from './components/PreparationWorkspaceView';
-import AdaptivePracticeView from './components/AdaptivePracticeView';
-import AnalyticsView from './components/AnalyticsView';
-import OverallReportView from './components/OverallReportView';
-import PlacementReadinessView from './components/PlacementReadinessView';
-import RoadmapView from './components/RoadmapView';
-import CoursesView from './components/CoursesView';
-import AssessmentView from './components/AssessmentView';
-import DsaSheetsView from './components/DsaSheetsView';
-import LearningResourcesView from './components/LearningResourcesView';
-import MockInterviewView from './components/MockInterviewView';
-import ResumeAnalysisView from './components/ResumeAnalysisView';
-import JobOpportunitiesView from './components/JobOpportunitiesView';
-import ApplicationTrackingView from './components/ApplicationTrackingView';
-import SkillsCertificatesView from './components/SkillsCertificatesView';
-import ProfileSettingsView from './components/ProfileSettingsView';
-import { CareerCoachView } from './components/CareerCoachView';
-import AdminPanelView from './components/AdminPanelView';
-import AuthView from './components/AuthView';
-import AuthModal from './components/AuthModal';
+
+// Route-level code splitting for production performance & chunk optimization
+const PreparationWorkspaceView = lazy(() => import('./components/PreparationWorkspaceView'));
+const AdaptivePracticeView = lazy(() => import('./components/AdaptivePracticeView'));
+const AnalyticsView = lazy(() => import('./components/AnalyticsView'));
+const PlacementReadinessView = lazy(() => import('./components/PlacementReadinessView'));
+const RoadmapView = lazy(() => import('./components/RoadmapView'));
+const CoursesView = lazy(() => import('./components/CoursesView'));
+const AssessmentView = lazy(() => import('./components/AssessmentView'));
+const DsaSheetsView = lazy(() => import('./components/DsaSheetsView'));
+const LearningResourcesView = lazy(() => import('./components/LearningResourcesView'));
+const MockInterviewView = lazy(() => import('./components/MockInterviewView'));
+const ResumeAnalysisView = lazy(() => import('./components/ResumeAnalysisView'));
+const JobOpportunitiesView = lazy(() => import('./components/JobOpportunitiesView'));
+const ApplicationTrackingView = lazy(() => import('./components/ApplicationTrackingView'));
+const SkillsCertificatesView = lazy(() => import('./components/SkillsCertificatesView'));
+const ProfileSettingsView = lazy(() => import('./components/ProfileSettingsView'));
+const CareerCoachView = lazy(() => import('./components/CareerCoachView').then(m => ({ default: m.CareerCoachView })));
+const AdminPanelView = lazy(() => import('./components/AdminPanelView'));
+const AuthView = lazy(() => import('./components/AuthView'));
+const AuthModal = lazy(() => import('./components/AuthModal'));
+
+function ViewLoadingFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3">
+      <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-medium text-slate-400">Loading module...</span>
+    </div>
+  );
+}
 import { apiClient } from './api/client';
 import { dal } from './lib/supabaseClient';
 
@@ -295,7 +306,9 @@ export default function App() {
         />
       )}
 
-      {activeTab === 'dashboard' && (
+      <ErrorBoundary onNavigate={handleNavigate}>
+        <Suspense fallback={<ViewLoadingFallback />}>
+          {activeTab === 'dashboard' && (
         <DashboardView
           dashboardData={dashboardData}
           onNavigate={(tab) => setActiveTab(tab)}
@@ -436,6 +449,10 @@ export default function App() {
           }}
         />
       )}
+
+      
+        </Suspense>
+      </ErrorBoundary>
 
       {/* Auth Modal for Login/Registration */}
       <AuthModal
