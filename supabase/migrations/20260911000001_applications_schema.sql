@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- MODERN PLACEMENT LAUNCHPAD - PHASE 10: APPLICATION TRACKING & PLACEMENT PIPELINE
 -- Migration: 20260911000001_applications_schema.sql
 -- Description: Creates canonical public.applications table (Entity 15) with
@@ -33,6 +33,6 @@ CREATE INDEX IF NOT EXISTS idx_applications_status ON public.applications(status
 ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
 
 -- Strict User Ownership RLS Policy (auth.uid() = user_id)
-DROP POLICY IF EXISTS Users can access own applications ON public.applications;
-CREATE POLICY Users can access own applications ON public.applications
+DROP POLICY IF EXISTS "Users can access own applications" ON public.applications;
+CREATE POLICY "Users can access own applications" ON public.applications
     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);

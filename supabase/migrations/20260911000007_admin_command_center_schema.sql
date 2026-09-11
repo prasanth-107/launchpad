@@ -49,14 +49,14 @@ DROP POLICY IF EXISTS "Admins can view mock interviews" ON public.mock_interview
 CREATE POLICY "Admins can view mock interviews" ON public.mock_interviews
     FOR SELECT USING (public.is_admin(auth.uid()));
 
--- Job Applications: Admins can view applications for placement statistics
-DROP POLICY IF EXISTS "Admins can view job applications" ON public.job_applications;
-CREATE POLICY "Admins can view job applications" ON public.job_applications
+-- Applications: Admins can view applications for placement statistics
+DROP POLICY IF EXISTS "Admins can view applications" ON public.applications;
+CREATE POLICY "Admins can view applications" ON public.applications
     FOR SELECT USING (public.is_admin(auth.uid()));
 
--- Placement Readiness Snapshots: Admins can view snapshots for readiness trend analysis
-DROP POLICY IF EXISTS "Admins can view readiness snapshots" ON public.placement_readiness_snapshots;
-CREATE POLICY "Admins can view readiness snapshots" ON public.placement_readiness_snapshots
+-- Readiness Snapshots: Admins can view snapshots for readiness trend analysis
+DROP POLICY IF EXISTS "Admins can view readiness snapshots" ON public.readiness_snapshots;
+CREATE POLICY "Admins can view readiness snapshots" ON public.readiness_snapshots
     FOR SELECT USING (public.is_admin(auth.uid()));
 
 COMMENT ON COLUMN public.profiles.role IS 'User authorization role: candidate (default) or admin (institution/placement coordinator)';

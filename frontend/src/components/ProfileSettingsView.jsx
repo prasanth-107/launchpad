@@ -14,7 +14,6 @@ import {
   Settings, 
   Bell, 
   Key, 
-  ShieldCheck,
   Save,
   CheckCircle2,
   CircleDashed,
@@ -62,8 +61,6 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
   // Settings state
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [driveAlerts, setDriveAlerts] = useState(true);
-  const [youtubeApiKey, setYoutubeApiKey] = useState('');
-  const [geminiApiKey, setGeminiApiKey] = useState('');
 
   // Check resume and verified skills from database
   useEffect(() => {
@@ -587,7 +584,7 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
         <div className="max-w-3xl saas-card p-6 sm:p-8 space-y-6 text-xs">
           <div className="pb-4 border-b border-slate-100">
             <h3 className="text-base font-bold text-slate-900">Security & Account Configuration</h3>
-            <p className="text-slate-500 mt-0.5">Manage password credentials, persistent database layers, and notifications</p>
+            <p className="text-slate-500 mt-0.5">Manage password credentials, account preferences, and notifications</p>
           </div>
 
           {/* Password Management */}
@@ -673,74 +670,6 @@ export default function ProfileSettingsView({ user, onUpdateProfile, initialTab 
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm">Supabase PostgreSQL Database</h4>
-                <p className="text-[11px] text-slate-500">Persistent database connection, authentication, and Row Level Security (RLS)</p>
-              </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Supabase PostgreSQL Layer Active</span>
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-semibold">VITE_SUPABASE_URL:</span>
-                <span className="font-mono text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {import.meta.env.VITE_SUPABASE_URL || 'https://modern-placement-launchpad.supabase.co'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-semibold">VITE_SUPABASE_PUBLISHABLE_KEY:</span>
-                <span className="font-mono text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  {import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? 'sb_publishable_••••••' : 'Configured in .env'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-semibold">Row Level Security (RLS):</span>
-                <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Enabled (auth.uid() = user_id on all 8 user tables)</span>
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500 font-semibold">SQL Migration:</span>
-                <span className="font-mono text-slate-600 text-[11px]">
-                  supabase/migrations/20260910000001_modern_placement_launchpad_schema.sql
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 space-y-4">
-            <h4 className="font-bold text-slate-900 text-sm">External API Configuration (Optional)</h4>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">YouTube Data API Key</label>
-              <input
-                type="password"
-                value={youtubeApiKey}
-                onChange={(e) => setYoutubeApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:border-indigo-500"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Configured in backend .env; override here if needed for live searches</p>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Gemini AI API Key</label>
-              <input
-                type="password"
-                value={geminiApiKey}
-                onChange={(e) => setGeminiApiKey(e.target.value)}
-                placeholder="AIzaSy..."
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:border-indigo-500"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">Used for live interview grading and ATS analysis</p>
-            </div>
-          </div>
 
           <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button

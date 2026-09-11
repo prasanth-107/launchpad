@@ -227,7 +227,8 @@ function initDefaultStore() {
     job_opportunities: PLACEMENT_OPPORTUNITIES_CATALOG,
     // 13. saved_jobs (user-scoped saved placement drives)
     saved_jobs: [],
-    // 14. tracked_applications (user-scoped application tracking clicks)
+    // 14. applications (canonical Entity 15 placement pipeline)
+    applications: [],
     tracked_applications: [],
     // 15. readiness_snapshots (Entity 18 historical readiness audits)
     readiness_snapshots: [],
@@ -1158,6 +1159,10 @@ export const dal = {
       const store = getLocalStore();
       const list = store.applications || store.tracked_applications || [];
       return list.filter(a => a.user_id === userId);
+    },
+
+    async getAll(userId) {
+      return this.list(userId);
     },
 
     async get(userId, id) {
@@ -2287,9 +2292,9 @@ export const dal = {
       // 2. Fetch cohort data from database
       const [profiles, userSkills, attempts, applications] = await Promise.all([
         dal.profiles.getAll ? dal.profiles.getAll() : Promise.resolve([]),
-        supabase.from('user_skills').select('*').then(r => r.data || []),
-        supabase.from('assessment_attempts').select('*').then(r => r.data || []),
-        supabase.from('job_applications').select('*').then(r => r.data || [])
+        supabase ? supabase.from('user_skills').select('*').then(r => r.data || []) : Promise.resolve(getLocalStore().user_skills || []),
+        supabase ? supabase.from('assessment_attempts').select('*').then(r => r.data || []) : Promise.resolve(getLocalStore().assessment_attempts || []),
+        supabase ? supabase.from('applications').select('*').then(r => r.data || []) : Promise.resolve(getLocalStore().applications || getLocalStore().tracked_applications || [])
       ]);
 
       // Calculate individual readiness for each student
